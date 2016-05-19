@@ -26,42 +26,19 @@ MODIFICATIONS.
 */
 package firrtl_interpreter
 
-import scala.StringBuilder
-import scala.collection.mutable
+import org.scalatest.{Matchers, FlatSpec}
 
+class TimerSpec extends FlatSpec with Matchers {
+  behavior of "timer"
 
-case class TimerEvent(tag: String) {
-  var events  = 0L
-  var seconds = 0.0
-}
-
-object Timer {
-  val timingLog = new mutable.HashMap[String, TimerEvent]
-
-  def apply[R](tag: String)(block: => R): R = {
-    val t0 = System.nanoTime()
-    val result = block    // call-by-name
-    val t1 = System.nanoTime()
-
-    val timerEvent = timingLog.getOrElseUpdate(tag, new TimerEvent(tag))
-    timerEvent.events  += 1
-    timerEvent.seconds += ((t1 - t0).toDouble / 1000000000.0)
-    result
-  }
-
-  def entryFor(tag: String): String = {
-    timingLog.get(tag) match {
-      case Some(entry) => s"${entry.events}:${entry.seconds}:${entry.seconds / entry.events.toDouble}"
-      case _           => ""
+  it should "count times" in {
+    val tag = "test1"
+    Timer(tag) {
+      Thread.sleep(3000)
     }
-  }
-
-  def report(): String = {
-    val result = new StringBuilder()
-    val sortedTags = timingLog.keys.toSeq.sorted
-    for(tag <- sortedTags) {
-      result.append(s"$tag:${entryFor(tag)}")
-    }
-    result.toString()
+    Timer.timingLog.size should be (1)
+    Timer.timingLog(tag).events should be (1)
+    Timer.timingLog(tag).seconds should be > 2.0
+    println(Timer.report())
   }
 }
