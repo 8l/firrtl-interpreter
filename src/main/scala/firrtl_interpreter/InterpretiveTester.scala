@@ -47,6 +47,8 @@ class InterpretiveTester(input: String) {
     interpreter.setVerbose(value)
   }
 
+  val startTime = System.nanoTime()
+
   /**
     * Pokes value to the port referenced by string
     * Warning: pokes to components other than input ports is currently
@@ -82,6 +84,7 @@ class InterpretiveTester(input: String) {
 
   /**
     * require that a value be present on the named component
+ *
     * @param name component name
     * @param expectedValue the BigInt value required
     */
@@ -104,6 +107,7 @@ class InterpretiveTester(input: String) {
   /**
     * Cycles the circuit n steps (with a default of one)
     * At each step registers and memories are advanced and all other elements recomputed
+ *
     * @param n cycles to perform
     */
   def step(n: Int = 1): Unit = {
@@ -116,9 +120,13 @@ class InterpretiveTester(input: String) {
     * A simplistic report of the number of expects that passed and
     */
   def report(): Unit = {
+    val endTime = System.nanoTime()
+    val elapsedSeconds = (endTime - startTime).toDouble / 1000000.0
     println(
       s"test ${interpreter.loweredAst.modules.head.name} " +
         s"Success: $expectationsMet tests passed " +
-        s"in ${interpreter.circuitState.stateCounter} cycles")
+        s"in ${interpreter.circuitState.stateCounter} cycles " +
+        s"taking $elapsedSeconds seconds"
+    )
   }
 }
