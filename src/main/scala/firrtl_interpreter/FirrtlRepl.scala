@@ -284,6 +284,33 @@ class FirrtlRepl {
           console.println(interpreter.circuitState.prettyString())
         }
       },
+      new Command("verbose") {
+        def usage: (String, String) = ("verbose [true|false|toggle]",
+          "set evaluator verbose mode (default toggle) during dependency evaluation")
+        override def completer: Option[ArgumentCompleter] = {
+          if(interpreterOpt.isEmpty) {
+            None
+          }
+          else {
+            val validVerbose = ArrayBuffer.empty[String]
+            validVerbose ++= Seq("true", "false", "toggle")
+            val list: java.util.List[String] = validVerbose.asJava
+            Some(new ArgumentCompleter(
+              new StringsCompleter({ "verbose"}),
+              new StringsCompleter(list)
+            ))
+          }
+        }
+        def run(args: Array[String]): Unit = {
+          getOneArg("verbose must be followed by true false or toggle", Some("toggle")) match {
+            case Some("toggle") => interpreter.setVerbose(! interpreter.verbose)
+            case Some("true")   => interpreter.setVerbose(true)
+            case Some("false")  => interpreter.setVerbose(false)
+            case _ =>
+          }
+          console.println(s"evaluator verbosity is now ${interpreter.verbose}")
+        }
+      },
       new Command("help") {
         def usage: (String, String) = ("help", "show available commands")
         def run(args: Array[String]): Unit = {
