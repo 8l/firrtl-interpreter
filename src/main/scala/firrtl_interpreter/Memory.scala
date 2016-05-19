@@ -103,6 +103,10 @@ class Memory(
     ports(portName).fieldDependencies
   }
 
+  def getAllFieldDependencies: Seq[String] = {
+    (readPorts ++ writePorts ++ readWritePorts).flatMap { case port: MemoryPort => port.fieldDependencies}
+  }
+
   override def toString: String = {
     s"memory $name" +
     readPorts.mkString(" rp:", ",", "") +

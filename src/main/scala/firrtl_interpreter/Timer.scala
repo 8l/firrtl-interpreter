@@ -62,6 +62,10 @@ object Timer {
     }
   }
 
+  def clear(): Unit = {
+    timingLog.clear()
+  }
+
   def report(): String = {
     val sortedTags = timingLog.keys.toSeq.sorted
     sortedTags.map { tag =>

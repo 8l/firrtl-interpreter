@@ -21,6 +21,15 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
 
   val expressionStack = new ArrayBuffer[Expression]
 
+  var defaultKeysToResolve = {
+    val keys = new mutable.HashSet[String]
+    keys ++= dependencyGraph.outputPorts
+    keys ++= dependencyGraph.registerNames
+    keys ++= circuitState.memories.flatMap { case (name, memory) => memory.getAllFieldDependencies}
+    println(s"resolveDependencies: keys $keys")
+    keys
+  }
+
   /**
     * get the value from the current circuit state, if it is dependent on something else
     * we haven't computed yet. resolve this new dependency first then pull it's value from the
@@ -373,7 +382,7 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
             log("resolving memory key")
           }
         case _ =>
-          throw new InterruptedException(s"Error: attempt to resolve dependency for unknown key $key")
+          // throw new InterruptedException(s"Error: attempt to resolve dependency for unknown key $key")
       }
     }
 
@@ -400,10 +409,7 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
   }
 
   def resolveDependencies(specificDependencies: Seq[String]): Unit = {
-    toResolve = {
-      if (specificDependencies.isEmpty) { mutable.HashSet(dependencyGraph.keys.toSeq: _*) }
-      else { mutable.HashSet(specificDependencies: _*) }
-    }
+    toResolve = defaultKeysToResolve.clone()
 
     val memKeys = toResolve.filter { circuitState.isMemory }
     toResolve --= memKeys

@@ -111,10 +111,12 @@ class FirrtlRepl {
                 val input = io.Source.fromFile(file).mkString
                 interpreterOpt = Some(FirrtlTerp(input))
                 buildCompletions()
+                Timer.clear()
               }
               catch {
                 case e: Exception =>
                   error(s"exception ${e.getMessage} $e")
+                  e.printStackTrace()
               }
             case _ =>
           }
@@ -287,11 +289,29 @@ class FirrtlRepl {
         }
       },
       new Command("timing") {
-        def usage: (String, String) = ("timing", "show the current timing state")
+        def usage: (String, String) = ("timing [clear]", "show the current timing state")
+        override def completer: Option[ArgumentCompleter] = {
+          if(interpreterOpt.isEmpty) {
+            None
+          }
+          else {
+            val validVerbose = ArrayBuffer.empty[String]
+            validVerbose ++= Seq("clear")
+            val list: java.util.List[String] = validVerbose.asJava
+            Some(new ArgumentCompleter(
+              new StringsCompleter({ "timimg"}),
+              new StringsCompleter(list)
+            ))
+          }
+        }
         def run(args: Array[String]): Unit = {
-          val names = (interpreter.dependencyGraph.validNames -- interpreter.dependencyGraph.inputPorts).toSeq.sorted
-          for(name <- names) {
-            console.println(s"$name:${Timer.entryFor(name)}")
+          getOneArg("", Some("")) match {
+            case Some("clear") => Timer.clear()
+            case _ =>
+              val names = (interpreter.dependencyGraph.validNames -- interpreter.dependencyGraph.inputPorts).toSeq.sorted
+              for (name <- names) {
+                console.println(s"$name:${Timer.entryFor(name)}")
+              }
           }
         }
       },
@@ -395,6 +415,9 @@ class FirrtlRepl {
         if (args.length > 0) {
           if (Commands.commandMap.contains(args.head)) {
             Commands.commandMap(args.head).run(args.tail)
+          }
+          else {
+            error(s"unknown command $line, try help")
           }
         }
         else {
