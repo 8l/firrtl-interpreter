@@ -273,6 +273,7 @@ case class ConcreteUInt(val value: BigInt, val width: Int) extends Concrete {
     if(newWidth == width) this else ConcreteUInt(this.value, newWidth)
   }
   def forceWidth(tpe: Type): ConcreteUInt = forceWidth(typeToWidth(tpe))
+  override def toString: String = s"$value.U<$width>"
 }
 /**
   * A runtime instance of a SInt
@@ -300,6 +301,7 @@ case class ConcreteSInt(val value: BigInt, val width: Int) extends Concrete {
     if(newWidth == width) this else ConcreteSInt(this.value, newWidth)
   }
   def forceWidth(tpe: Type): ConcreteSInt = forceWidth(typeToWidth(tpe))
+  override def toString: String = s"$value.U<$width>"
 }
 case class ConcreteClock(val value: BigInt) extends Concrete {
   val width = 1

@@ -226,8 +226,16 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
     * Note: OpCodes here are double matched, once in main loop herein, then again in function suitable for that
     * family of opCodes, it makes the code cleaner, I think, but may ultimately need to be inlined for performance
     */
-  def evaluate(expression: Expression): Concrete = {
-    log(s"evaluate $expression")
+  def evaluate(expression: Expression, leftHandSideOption: Option[String] = None): Concrete = {
+    log(
+      leftHandSideOption match {
+        case Some(key) => s"evaluate    " +
+          s"" +
+          s"" +
+          s" ${leftHandSideOption.getOrElse("")} <= ${expression.serialize}"
+        case _         => s"evaluate     ${expression.serialize}"
+      }
+    )
     indent()
     expressionStack += expression
 
@@ -328,7 +336,12 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
 
     expressionStack.remove(expressionStack.size-1)
     dedent()
-    log(s"evaluator:returns:$result")
+    log(
+      leftHandSideOption match {
+        case Some(key) => s"evaluates to ${leftHandSideOption.getOrElse("")} <= $result"
+        case _         => s"evaluates to $result"
+      }
+    )
 
     result
   }
@@ -358,7 +371,7 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
 
 //    toResolve -= key
 
-    log(s"resolveDependency:start: $key")
+//    log(s"resolveDependency:start: $key")
     resolveDepth += 1
 
     val value = if(circuitState.isInput(key)) {
@@ -366,12 +379,12 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
     }
     else {
       val expression = dependencyGraph.nameToExpression(key)
-      evaluate(expression)
+      evaluate(expression, Some(key))
     }
     circuitState.setValue(key, value)
 
     resolveDepth -= 1
-    log(s"resolveDependency:done: $key <= $value")
+//    log(s"resolveDependency:done: $key <= $value")
 
     value
   }
