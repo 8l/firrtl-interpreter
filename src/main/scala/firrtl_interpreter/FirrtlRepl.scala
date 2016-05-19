@@ -7,10 +7,17 @@ import scala.collection.mutable.ArrayBuffer
 import scala.tools.jline.console.ConsoleReader
 import scala.tools.jline.console.history.FileHistory
 import scala.tools.jline.TerminalFactory
+import scala.tools.jline.console.completer._
+import collection.JavaConverters._
 
 abstract class Command(val name: String) {
   def run(args: Array[String])
   def usage: (String, String)
+  def completer: Option[ArgumentCompleter] = {
+    Some(new ArgumentCompleter(
+      new StringsCompleter({name})
+    ))
+  }
 }
 
 class FirrtlRepl {
@@ -27,8 +34,8 @@ class FirrtlRepl {
   history.load(historyFile)
   console.setHistory(history)
 
-  var interpreter_opt: Option[FirrtlTerp] = None
-  def interpreter: FirrtlTerp = interpreter_opt.get
+  var interpreterOpt: Option[FirrtlTerp] = None
+  def interpreter: FirrtlTerp = interpreterOpt.get
   var args = Array.empty[String]
   var done = false
 
@@ -58,6 +65,12 @@ class FirrtlRepl {
     commands ++= Seq(
       new Command("load") {
         def usage: (String, String) = ("load fileName", "load/replace the current firrtl file")
+        override def completer: Option[ArgumentCompleter] = {
+          Some(new ArgumentCompleter(
+            new StringsCompleter({"load"}),
+            new FileNameCompleter
+          ))
+        }
         def run(args: Array[String]): Unit = {
           getOneArg("load filename") match {
             case Some(fileName) =>
@@ -70,7 +83,8 @@ class FirrtlRepl {
                   }
                 }
                 val input = io.Source.fromFile(file).mkString
-                interpreter_opt = Some(FirrtlTerp(input))
+                interpreterOpt = Some(FirrtlTerp(input))
+                buildCompletions()
               }
               catch {
                 case e: Exception =>
@@ -82,6 +96,22 @@ class FirrtlRepl {
       },
       new Command("poke") {
         def usage: (String, String) = ("poke inputPortName value", "set an input port to the given integer value")
+        override def completer: Option[ArgumentCompleter] = {
+          if(interpreterOpt.isEmpty) {
+            None
+          }
+          else {
+            val inputPorts = ArrayBuffer.empty[String]
+            inputPorts ++= interpreter.dependencyGraph.inputPorts.toSeq
+            val list: java.util.List[String] = inputPorts.asJava
+            Some(new ArgumentCompleter(
+              new StringsCompleter({
+                "poke"
+              }),
+              new StringsCompleter(list)
+            ))
+          }
+        }
         def run(args: Array[String]): Unit = {
           getTwoArgs("poke inputPortName value") match {
             case Some((portName, valueString)) =>
@@ -99,12 +129,65 @@ class FirrtlRepl {
       },
       new Command("peek") {
         def usage: (String, String) = ("peek componentName", "show the current value of the named circuit component")
+        override def completer: Option[ArgumentCompleter] = {
+          if(interpreterOpt.isEmpty) {
+            None
+          }
+          else {
+            val inputPorts = ArrayBuffer.empty[String]
+            inputPorts ++= interpreter.circuitState.validNames.toSeq
+            val list: java.util.List[String] = inputPorts.asJava
+            Some(new ArgumentCompleter(
+              new StringsCompleter({
+                "peek"
+              }),
+              new StringsCompleter(list)
+            ))
+          }
+        }
         def run(args: Array[String]): Unit = {
           getOneArg("peek componentName") match {
             case Some(componentName) =>
               try {
                 val value = interpreter.getValue(componentName)
                 console.println(s"peek $componentName $value")
+              }
+              catch {
+                case e: Exception =>
+                  error(s"exception ${e.getMessage} $e")
+              }
+            case _ =>
+          }
+        }
+      },
+      new Command("randomize") {
+        def usage: (String, String) = ("randomize",
+          "randomize all inputs except reset)")
+        def run(args: Array[String]): Unit = {
+          for{
+            (inputPortName, value) <- interpreter.circuitState.inputPorts
+            if inputPortName != "reset"
+          } {
+            interpreter.setValue(inputPortName, TypeInstanceFactory(value, randomBigInt(value.width)))
+          }
+          console.println(interpreter.circuitState.prettyString())
+        }
+      },
+      new Command("reset") {
+        def usage: (String, String) = ("reset [numberOfSteps]",
+          "assert reset (if present) for numberOfSteps (default 1)")
+        def run(args: Array[String]): Unit = {
+          getOneArg("reset [numberOfSteps]", Some("1")) match {
+            case Some(numberOfStepsString) =>
+              try {
+                interpreter.setValueWithBigInt("reset", 1)
+                val numberOfSteps = numberOfStepsString.toInt
+                for(stepNumber <- 0 until numberOfSteps) {
+                  interpreter.cycle(showState = false)
+                  interpreter.evaluateCircuit()
+                }
+                interpreter.setValueWithBigInt("reset", 0)
+                console.println(interpreter.circuitState.prettyString())
               }
               catch {
                 case e: Exception =>
@@ -164,7 +247,17 @@ class FirrtlRepl {
     val commandMap = commands.map(command => command.name -> command).toMap
   }
 
+  def buildCompletions(): Unit = {
+    console.setCompletionHandler(new CandidateListCompletionHandler {})
+    Commands.commands.flatMap { command =>
+      command.completer
+    }.foreach { completer =>
+      console.addCompleter(completer)
+    }
+  }
+
   def run() {
+    buildCompletions()
     console.setPrompt("firrtl>> ")
 
     while (! done) {
