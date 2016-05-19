@@ -20,6 +20,7 @@ abstract class Command(val name: String) {
   }
 }
 
+//noinspection ScalaStyle
 class FirrtlRepl {
   val terminal = TerminalFactory.create()
   val console = new ConsoleReader
@@ -70,10 +71,11 @@ class FirrtlRepl {
         None
       }
     }
+    //noinspection ScalaStyle
     def getThreeArgs(failureMessage: String,
-                   arg1Option: Option[String] = None,
-                   arg2Option: Option[String] = None,
-                   arg3Option: Option[String] = None
+                     arg1Option: Option[String] = None,
+                     arg2Option: Option[String] = None,
+                     arg3Option: Option[String] = None
                   ): Option[(String,String,String)] = {
       (args.length, arg1Option, arg2Option, arg3Option) match {
         case (4, _, _, _)                             => Some(args(1), args(2), args(3))
@@ -282,6 +284,15 @@ class FirrtlRepl {
         def usage: (String, String) = ("show", "show the state of the circuit")
         def run(args: Array[String]): Unit = {
           console.println(interpreter.circuitState.prettyString())
+        }
+      },
+      new Command("timing") {
+        def usage: (String, String) = ("timing", "show the current timing state")
+        def run(args: Array[String]): Unit = {
+          val names = (interpreter.dependencyGraph.validNames -- interpreter.dependencyGraph.inputPorts).toSeq.sorted
+          for(name <- names) {
+            console.println(s"$name:${Timer.entryFor(name)}")
+          }
         }
       },
       new Command("verbose") {

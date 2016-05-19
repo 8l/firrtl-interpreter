@@ -13,9 +13,11 @@ import scala.collection.mutable.ArrayBuffer
   *
   * @param circuitState  the state of the system, should not be modified before all dependencies have been resolved
   */
+//noinspection ScalaStyle,ScalaStyle
 class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState: CircuitState) extends SimpleLogger {
   var toResolve = mutable.HashSet(dependencyGraph.keys.toSeq:_*)
   val inProcess = toResolve.empty
+  var evaluateAll = false
 
   val expressionStack = new ArrayBuffer[Expression]
 
@@ -243,9 +245,11 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
       expression match {
         case Mux(condition, trueExpression, falseExpression, tpe) =>
           val v = if (evaluate(condition).value > 0) {
+            if(evaluateAll) { evaluate(falseExpression)}
             evaluate(trueExpression)
           }
           else {
+            if(evaluateAll) { evaluate(trueExpression)}
             evaluate(falseExpression)
           }
           v.forceWidth(tpe)
@@ -261,6 +265,8 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
             evaluate(value).forceWidth(tpe)
           }
           else {
+            if(evaluateAll) { evaluate(value)}
+
             tpe match {
               case UIntType(IntWidth(w)) => Concrete.randomUInt(w.toInt)
               case SIntType(IntWidth(w)) => Concrete.randomSInt(w.toInt)
@@ -346,6 +352,8 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
     result
   }
 
+  def handlePrimOps() {}
+
   private def resolveDependency(key: String): Concrete = {
     if(toResolve.contains(key)) {
       toResolve -= key
@@ -379,7 +387,9 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
     }
     else {
       val expression = dependencyGraph.nameToExpression(key)
-      evaluate(expression, Some(key))
+      Timer(key) {
+        evaluate(expression, Some(key))
+      }
     }
     circuitState.setValue(key, value)
 
@@ -391,8 +401,8 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
 
   def resolveDependencies(specificDependencies: Seq[String]): Unit = {
     toResolve = {
-      if (specificDependencies.isEmpty) mutable.HashSet(dependencyGraph.keys.toSeq: _*)
-      else mutable.HashSet(specificDependencies: _*)
+      if (specificDependencies.isEmpty) { mutable.HashSet(dependencyGraph.keys.toSeq: _*) }
+      else { mutable.HashSet(specificDependencies: _*) }
     }
 
     val memKeys = toResolve.filter { circuitState.isMemory }
@@ -423,7 +433,7 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
 
   def checkStops(): Option[Int] = {
     for(stopStatement <- dependencyGraph.stops) {
-      if(evaluate(stopStatement.en).value > 0) {
+      if(evaluate(stopStatement.en, Some("stop")).value > 0) {
         if(stopStatement.ret == 0) {
           println(s"Success:${stopStatement.info}")
           return Some(0)

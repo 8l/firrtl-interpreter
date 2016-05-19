@@ -32,36 +32,40 @@ import scala.collection.mutable
 
 case class TimerEvent(tag: String) {
   var events  = 0L
-  var seconds = 0.0
+  var seconds = 0L
 }
 
 object Timer {
+  var enabled = true
   val timingLog = new mutable.HashMap[String, TimerEvent]
 
   def apply[R](tag: String)(block: => R): R = {
-    val t0 = System.nanoTime()
-    val result = block    // call-by-name
-    val t1 = System.nanoTime()
+    if(enabled) {
+      val t0 = System.nanoTime()
+      val result = block // call-by-name
+      val t1 = System.nanoTime()
 
-    val timerEvent = timingLog.getOrElseUpdate(tag, new TimerEvent(tag))
-    timerEvent.events  += 1
-    timerEvent.seconds += ((t1 - t0).toDouble / 1000000000.0)
-    result
+      val timerEvent = timingLog.getOrElseUpdate(tag, new TimerEvent(tag))
+      timerEvent.events += 1
+      timerEvent.seconds += (t1 - t0)
+      result
+    }
+    else {
+      block
+    }
   }
 
   def entryFor(tag: String): String = {
     timingLog.get(tag) match {
-      case Some(entry) => s"${entry.events}:${entry.seconds}:${entry.seconds / entry.events.toDouble}"
+      case Some(entry) => s"${entry.events}:${entry.seconds}:${entry.seconds / entry.events}"
       case _           => ""
     }
   }
 
   def report(): String = {
-    val result = new StringBuilder()
     val sortedTags = timingLog.keys.toSeq.sorted
-    for(tag <- sortedTags) {
-      result.append(s"$tag:${entryFor(tag)}")
-    }
-    result.toString()
+    sortedTags.map { tag =>
+      s"$tag:${entryFor(tag)}"
+    }.mkString("\n")
   }
 }
