@@ -52,9 +52,40 @@ class FirrtlRepl {
         None
       }
     }
-    def getTwoArgs(failureMessage: String): Option[(String,String)] = {
+    def getTwoArgs(failureMessage: String,
+                   arg1Option: Option[String] = None,
+                   arg2Option: Option[String] = None
+                  ): Option[(String,String)] = {
       if(args.length == 3) {
         Some(args(1), args(2))
+      }
+      else if(args.length == 2 && arg2Option.isDefined) {
+        Some(args(1), arg2Option.get)
+      }
+      else if(args.length == 1 && arg1Option.isDefined && arg2Option.isDefined) {
+        Some(arg1Option.get, arg2Option.get)
+      }
+      else {
+        error(failureMessage)
+        None
+      }
+    }
+    def getThreeArgs(failureMessage: String,
+                   arg1Option: Option[String] = None,
+                   arg2Option: Option[String] = None,
+                   arg3Option: Option[String] = None
+                  ): Option[(String,String,String)] = {
+      if(args.length == 4) {
+        Some(args(1), args(2), args(3))
+      }
+      else if(args.length == 3 && arg3Option.isDefined) {
+        Some(args(1), args(2), arg3Option.get)
+      }
+      else if(args.length == 2 && arg2Option.isDefined && arg3Option.isDefined) {
+        Some(args(1), arg2Option.get, arg3Option.get)
+      }
+      else if(args.length == 1 && arg1Option.isDefined && arg2Option.isDefined && arg3Option.isDefined) {
+        Some(arg1Option.get, arg2Option.get, arg3Option.get)
       }
       else {
         error(failureMessage)
@@ -219,6 +250,41 @@ class FirrtlRepl {
           }
         }
       },
+      new Command("waitfor") {
+        def usage: (String, String) = ("waitfor componentName value [maxNumberOfSteps]",
+          "wait for particular value (default 1) on component, up to maxNumberOfSteps (default 100)")
+        def run(args: Array[String]): Unit = {
+          getThreeArgs(
+            "waitfor componentName [value] [maxNumberOfSteps]",
+            arg2Option = Some("1"),
+            arg3Option = Some("100")
+          ) match {
+            case Some((componentName, valueString, maxNumberOfStepsString)) =>
+              try {
+                val maxNumberOfSteps = maxNumberOfStepsString.toInt
+                val value = valueString.toInt
+
+                var tries = 0
+                while(tries < maxNumberOfSteps && interpreter.getValue(componentName).value != BigInt(value)) {
+                  interpreter.cycle()
+                  tries += 1
+                }
+                if(interpreter.getValue(componentName).value != BigInt(value)) {
+                  console.println(
+                    s"waitfor exhausted $componentName did not take on value $value in $maxNumberOfSteps cycles")
+                }
+                else {
+                  console.println(s"$componentName == value $value in $tries cycles")
+                }
+              }
+              catch {
+                case e: Exception =>
+                  error(s"exception ${e.getMessage} $e")
+              }
+            case _ =>
+          }
+        }
+      },
       new Command("show") {
         def usage: (String, String) = ("show", "show the state of the circuit")
         def run(args: Array[String]): Unit = {
@@ -231,6 +297,7 @@ class FirrtlRepl {
           val maxColumn1Width = Commands.commands.map(_.usage._1.length).max + 2
           Commands.commands.foreach { command =>
             val (column1, column2) = command.usage
+            terminal.getWidth
 
             console.println(s"$column1${" "*(maxColumn1Width - column1.length)} $column2")
           }
