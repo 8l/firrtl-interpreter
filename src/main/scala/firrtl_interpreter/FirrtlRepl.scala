@@ -75,21 +75,14 @@ class FirrtlRepl {
                    arg2Option: Option[String] = None,
                    arg3Option: Option[String] = None
                   ): Option[(String,String,String)] = {
-      if(args.length == 4) {
-        Some(args(1), args(2), args(3))
-      }
-      else if(args.length == 3 && arg3Option.isDefined) {
-        Some(args(1), args(2), arg3Option.get)
-      }
-      else if(args.length == 2 && arg2Option.isDefined && arg3Option.isDefined) {
-        Some(args(1), arg2Option.get, arg3Option.get)
-      }
-      else if(args.length == 1 && arg1Option.isDefined && arg2Option.isDefined && arg3Option.isDefined) {
-        Some(arg1Option.get, arg2Option.get, arg3Option.get)
-      }
-      else {
-        error(failureMessage)
-        None
+      (args.length, arg1Option, arg2Option, arg3Option) match {
+        case (4, _, _, _)                             => Some(args(1), args(2), args(3))
+        case (3, _, _, Some(arg3))                    => Some(args(1), args(2), arg3)
+        case (2, _, Some(arg2), Some(arg3))           => Some(args(1), arg2, arg3)
+        case (1, Some(arg1), Some(arg2), Some(arg3))  => Some(arg1, arg2, arg3)
+        case _ =>
+          error(failureMessage)
+          None
       }
     }
     val commands = ArrayBuffer.empty[Command]
