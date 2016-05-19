@@ -1,39 +1,16 @@
-/*
-Copyright (c) 2014 - 2016 The Regents of the University of
-California (Regents). All Rights Reserved.  Redistribution and use in
-source and binary forms, with or without modification, are permitted
-provided that the following conditions are met:
-   * Redistributions of source code must retain the above
-     copyright notice, this list of conditions and the following
-     two paragraphs of disclaimer.
-   * Redistributions in binary form must reproduce the above
-     copyright notice, this list of conditions and the following
-     two paragraphs of disclaimer in the documentation and/or other materials
-     provided with the distribution.
-   * Neither the name of the Regents nor the names of its contributors
-     may be used to endorse or promote products derived from this
-     software without specific prior written permission.
-IN NO EVENT SHALL REGENTS BE LIABLE TO ANY PARTY FOR DIRECT, INDIRECT,
-SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES, INCLUDING LOST PROFITS,
-ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF
-REGENTS HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-REGENTS SPECIFICALLY DISCLAIMS ANY WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE. THE SOFTWARE AND ACCOMPANYING DOCUMENTATION, IF
-ANY, PROVIDED HEREUNDER IS PROVIDED "AS IS". REGENTS HAS NO OBLIGATION
-TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR
-MODIFICATIONS.
-*/
+// See LICENSE for license details.
 package firrtl_interpreter
 
 import java.io.File
 
+import scala.collection.mutable.ArrayBuffer
 import scala.tools.jline.console.ConsoleReader
 import scala.tools.jline.console.history.FileHistory
 import scala.tools.jline.TerminalFactory
 
 abstract class Command(val name: String) {
   def run(args: Array[String])
+  def usage: (String, String)
 }
 
 class FirrtlRepl {
@@ -60,7 +37,7 @@ class FirrtlRepl {
       if(args.length == 2) {
         Some(args(1))
       }
-      else if(args.length == 1 && argOption != None) {
+      else if(args.length == 1 && argOption.isDefined) {
         Some(argOption.get)
       }
       else {
@@ -77,8 +54,10 @@ class FirrtlRepl {
         None
       }
     }
-    val commands = Array(
+    val commands = ArrayBuffer.empty[Command]
+    commands ++= Seq(
       new Command("load") {
+        def usage: (String, String) = ("load fileName", "load/replace the current firrtl file")
         def run(args: Array[String]): Unit = {
           getOneArg("load filename") match {
             case Some(fileName) =>
@@ -102,6 +81,7 @@ class FirrtlRepl {
         }
       },
       new Command("poke") {
+        def usage: (String, String) = ("poke inputPortName value", "set an input port to the given integer value")
         def run(args: Array[String]): Unit = {
           getTwoArgs("poke inputPortName value") match {
             case Some((portName, valueString)) =>
@@ -118,6 +98,7 @@ class FirrtlRepl {
         }
       },
       new Command("peek") {
+        def usage: (String, String) = ("peek componentName", "show the current value of the named circuit component")
         def run(args: Array[String]): Unit = {
           getOneArg("peek componentName") match {
             case Some(componentName) =>
@@ -134,6 +115,8 @@ class FirrtlRepl {
         }
       },
       new Command("step") {
+        def usage: (String, String) = ("step [numberOfSteps]",
+          "cycle the clock numberOfSteps (default 1) times, and show state")
         def run(args: Array[String]): Unit = {
           getOneArg("step [numberOfSteps]", Some("1")) match {
             case Some(numberOfStepsString) =>
@@ -154,11 +137,24 @@ class FirrtlRepl {
         }
       },
       new Command("show") {
+        def usage: (String, String) = ("show", "show the state of the circuit")
         def run(args: Array[String]): Unit = {
           console.println(interpreter.circuitState.prettyString())
         }
       },
+      new Command("help") {
+        def usage: (String, String) = ("help", "show available commands")
+        def run(args: Array[String]): Unit = {
+          val maxColumn1Width = Commands.commands.map(_.usage._1.length).max + 2
+          Commands.commands.foreach { command =>
+            val (column1, column2) = command.usage
+
+            console.println(s"$column1${" "*(maxColumn1Width - column1.length)} $column2")
+          }
+        }
+      },
       new Command("quit") {
+        def usage: (String, String) = ("quit", "exit the interpreter")
         def run(args: Array[String]): Unit = {
           history.removeLast()
           done = true
@@ -193,15 +189,14 @@ class FirrtlRepl {
           done = true
       }
     }
-    println(s"saving history ${history.size()}")
+    console.println(s"saving history ${history.size()}")
     history.flush()
-    println("flush done")
     console.shutdown()
     terminal.restore()
   }
 
   def error(message: String): Unit = {
-    println(s"Error: $message")
+    console.println(s"Error: $message")
   }
 }
 
