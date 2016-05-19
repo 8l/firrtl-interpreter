@@ -27,7 +27,6 @@ MODIFICATIONS.
 package firrtl_interpreter
 
 import java.io.File
-import java.util
 
 import scala.tools.jline.console.ConsoleReader
 import scala.tools.jline.console.history.FileHistory
@@ -51,14 +50,27 @@ class FirrtlRepl {
   history.load(historyFile)
   console.setHistory(history)
 
-  var interpreter: Option[FirrtlTerp] = None
+  var interpreter_opt: Option[FirrtlTerp] = None
+  def interpreter: FirrtlTerp = interpreter_opt.get
   var args = Array.empty[String]
   var done = false
 
   object Commands {
-    def getOneArg(failureMessage: String): Option[String] = {
+    def getOneArg(failureMessage: String, argOption: Option[String] = None): Option[String] = {
       if(args.length == 2) {
         Some(args(1))
+      }
+      else if(args.length == 1 && argOption != None) {
+        Some(argOption.get)
+      }
+      else {
+        error(failureMessage)
+        None
+      }
+    }
+    def getTwoArgs(failureMessage: String): Option[(String,String)] = {
+      if(args.length == 3) {
+        Some(args(1), args(2))
       }
       else {
         error(failureMessage)
@@ -71,8 +83,15 @@ class FirrtlRepl {
           getOneArg("load filename") match {
             case Some(fileName) =>
               try {
-                val input = io.Source.fromFile(fileName).mkString
-                interpreter = Some(FirrtlTerp(input))
+                var file = new File(fileName)
+                if(! file.exists()) {
+                  file = new File(fileName + ".fir")
+                  if(! file.exists()) {
+                    throw new Exception(s"file $fileName does not exist")
+                  }
+                }
+                val input = io.Source.fromFile(file).mkString
+                interpreter_opt = Some(FirrtlTerp(input))
               }
               catch {
                 case e: Exception =>
@@ -84,22 +103,59 @@ class FirrtlRepl {
       },
       new Command("poke") {
         def run(args: Array[String]): Unit = {
-          println("poke")
+          getTwoArgs("poke inputPortName value") match {
+            case Some((portName, valueString)) =>
+              try {
+                val value = valueString.toInt
+                interpreter.setValueWithBigInt(portName, value)
+              }
+              catch {
+                case e: Exception =>
+                  error(s"exception ${e.getMessage} $e")
+              }
+            case _ =>
+          }
         }
       },
       new Command("peek") {
         def run(args: Array[String]): Unit = {
-          println("peek")
+          getOneArg("peek componentName") match {
+            case Some(componentName) =>
+              try {
+                val value = interpreter.getValue(componentName)
+                console.println(s"peek $componentName $value")
+              }
+              catch {
+                case e: Exception =>
+                  error(s"exception ${e.getMessage} $e")
+              }
+            case _ =>
+          }
         }
       },
-      new Command("peek") {
+      new Command("step") {
         def run(args: Array[String]): Unit = {
-
+          getOneArg("step [numberOfSteps]", Some("1")) match {
+            case Some(numberOfStepsString) =>
+              try {
+                val numberOfSteps = numberOfStepsString.toInt
+                for(stepNumber <- 0 until numberOfSteps) {
+                  interpreter.cycle(showState = false)
+                  interpreter.evaluateCircuit()
+                }
+                console.println(interpreter.circuitState.prettyString())
+              }
+              catch {
+                case e: Exception =>
+                  error(s"exception ${e.getMessage} $e")
+              }
+            case _ =>
+          }
         }
       },
-      new Command("expect") {
+      new Command("show") {
         def run(args: Array[String]): Unit = {
-          println("expect")
+          console.println(interpreter.circuitState.prettyString())
         }
       },
       new Command("quit") {
@@ -120,7 +176,7 @@ class FirrtlRepl {
 
         val line = console.readLine()
 
-        args = line.split((" "))
+        args = line.split(" ")
 
         if (args.length > 0) {
           if (Commands.commandMap.contains(args.head)) {
