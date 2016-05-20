@@ -379,7 +379,7 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
   }
 
   def resolveDependencies(specificDependencies: Iterable[String]): Unit = {
-    val toResolve = if(keyOrderInitialized) keyOrder else defaultKeysToResolve
+    val toResolve: Iterable[String] = if(keyOrderInitialized) keyOrder else defaultKeysToResolve
 
     for(key <- toResolve) {
       resolveDependency(key)

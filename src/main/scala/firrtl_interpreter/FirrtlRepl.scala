@@ -40,6 +40,11 @@ class FirrtlRepl {
   var args = Array.empty[String]
   var done = false
 
+  var inScript = false
+  val scriptFactory = ScriptFactory(this)
+  var currentScript: Option[Script] = None
+  val intPattern = """(-?\d+)""".r
+
   object Commands {
     def getOneArg(failureMessage: String, argOption: Option[String] = None): Option[String] = {
       if(args.length == 2) {
@@ -119,6 +124,59 @@ class FirrtlRepl {
                   e.printStackTrace()
               }
             case _ =>
+          }
+        }
+      },
+      new Command("script") {
+        def usage: (String, String) = ("script fileName", "load a script from a text file")
+        override def completer: Option[ArgumentCompleter] = {
+          Some(new ArgumentCompleter(
+            new StringsCompleter({"script"}),
+            new FileNameCompleter
+          ))
+        }
+        def run(args: Array[String]): Unit = {
+          getOneArg("script filename") match {
+            case Some(fileName) =>
+              currentScript = scriptFactory(fileName)
+              currentScript match {
+                case Some(script) =>
+                  console.println(s"loaded ${script.length} ${script.fileName}")
+                case _ =>
+              }
+            case _ =>
+          }
+        }
+      },
+      new Command("run") {
+        def usage: (String, String) = ("run [linesToRun|all|reset]", "run loaded script")
+        override def completer: Option[ArgumentCompleter] = {
+          Some(new ArgumentCompleter(
+            new StringsCompleter({"script"}),
+            new FileNameCompleter
+          ))
+        }
+        def run(args: Array[String]): Unit = {
+          currentScript match {
+            case Some(script) =>
+              getOneArg("run [linesToRun|all|reset]", argOption = Some("all")) match {
+                case Some("all")   =>
+                  console.println("run all")
+                  if(script.atEnd) script.reset()
+                  else script.runRemaining()
+                case Some("reset") => script.reset()
+                  console.println("run reset")
+                case Some(intPattern(intString)) =>
+                  console.println(s"run $intString")
+                  val linesToRun = intString.toInt
+                  script.setLinesToRun(linesToRun)
+                case None =>
+                  script.runRemaining()
+                case Some(arg) =>
+                  error(s"unrecognized run_argument $arg")
+              }
+            case _ =>
+              error(s"No current script")
           }
         }
       },
@@ -401,6 +459,22 @@ class FirrtlRepl {
     }
   }
 
+  def getNextLine: String = {
+    currentScript match {
+      case Some(script) =>
+        script.getNextLineOption() match {
+          case Some(line) =>
+            console.println(s"$line    [${script.currentLine}:${script.fileName}]")
+            console.println()
+            line
+          case _ =>
+            console.readLine()
+        }
+      case _ =>
+        console.readLine()
+    }
+  }
+
   def run() {
     buildCompletions()
     console.setPrompt("firrtl>> ")
@@ -408,7 +482,8 @@ class FirrtlRepl {
     while (! done) {
       try {
 
-        val line = console.readLine()
+//        val line = console.readLine()
+        val line = getNextLine
 
         args = line.split(" ")
 
