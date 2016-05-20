@@ -96,12 +96,12 @@ class InterpretiveTester(input: String) {
     */
   def report(): Unit = {
     val endTime = System.nanoTime()
-    val elapsedSeconds = (endTime - startTime).toDouble / 1000000.0
+    val elapsedSeconds = (endTime - startTime).toDouble / 1000000000.0
     println(
       s"test ${interpreter.loweredAst.modules.head.name} " +
         s"Success: $expectationsMet tests passed " +
         s"in ${interpreter.circuitState.stateCounter} cycles " +
-        s"taking $elapsedSeconds seconds"
+        f"taking $elapsedSeconds%.6f seconds"
     )
   }
 }

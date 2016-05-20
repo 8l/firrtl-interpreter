@@ -25,10 +25,15 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
     val keys = new mutable.HashSet[String]
     keys ++= dependencyGraph.outputPorts
     keys ++= dependencyGraph.registerNames
-    keys ++= circuitState.memories.flatMap { case (name, memory) => memory.getAllFieldDependencies}
+    keys ++= circuitState.memories.flatMap {
+      case (name, memory) => memory.getAllFieldDependencies
+    }.filter(dependencyGraph.nameToExpression.contains)
     println(s"resolveDependencies: keys $keys")
     keys
   }
+
+  var keyOrderInitialized = false
+  val keyOrder = new ArrayBuffer[String]()
 
   /**
     * get the value from the current circuit state, if it is dependent on something else
@@ -39,21 +44,21 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
     * @return
     */
   def getValue(key: String): Concrete = {
-    key match {
-      case Memory.KeyPattern(memoryName, portName, fieldName) =>
-        if(fieldName == "data") {
-          log(s"resolving: rhs memory data reference, dispatching implicit dependencies")
-          circuitState.getMemoryDependencies(memoryName, portName).foreach { dependentKey =>
-            if(toResolve.contains(dependentKey)) {
-              resolveDependency(dependentKey)
-            }
-          }
-        }
-        else {
-          log("resolving memory key")
-        }
-      case _ =>
-    }
+//    key match {
+//      case Memory.KeyPattern(memoryName, portName, fieldName) =>
+//        if(fieldName == "data") {
+//          log(s"resolving: rhs memory data reference, dispatching implicit dependencies")
+//          circuitState.getMemoryDependencies(memoryName, portName).foreach { dependentKey =>
+//            if(toResolve.contains(dependentKey)) {
+//              resolveDependency(dependentKey)
+//            }
+//          }
+//        }
+//        else {
+//          log("resolving memory key")
+//        }
+//      case _ =>
+//    }
     circuitState.getValue(key) match {
       case Some(value) => value
       case _ =>
@@ -400,6 +405,10 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
         evaluate(expression, Some(key))
       }
     }
+
+    if(! keyOrderInitialized) {
+      keyOrder += key
+    }
     circuitState.setValue(key, value)
 
     resolveDepth -= 1
@@ -423,6 +432,10 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
     while (toResolve.nonEmpty) {
       val key = toResolve.head
       resolveDependency(key)
+    }
+    if(! keyOrderInitialized) {
+      println(s"Key order ${keyOrder.mkString("\n")}")
+      keyOrderInitialized = true
     }
   }
 
