@@ -16,20 +16,22 @@ import scala.collection.mutable.ArrayBuffer
 //noinspection ScalaStyle,ScalaStyle
 class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState: CircuitState) extends SimpleLogger {
   var toResolve = mutable.HashSet(dependencyGraph.keys.toSeq:_*)
-  val inProcess = toResolve.empty
+
   var evaluateAll = false
 
   val expressionStack = new ArrayBuffer[Expression]
 
   var defaultKeysToResolve = {
     val keys = new mutable.HashSet[String]
-    keys ++= dependencyGraph.outputPorts
-    keys ++= dependencyGraph.registerNames
     keys ++= circuitState.memories.flatMap {
       case (name, memory) => memory.getAllFieldDependencies
     }.filter(dependencyGraph.nameToExpression.contains)
+
+    keys ++= dependencyGraph.outputPorts
+
+    keys ++= dependencyGraph.registerNames
     println(s"resolveDependencies: keys $keys")
-    keys
+    keys.toArray
   }
 
   var keyOrderInitialized = false
@@ -44,21 +46,6 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
     * @return
     */
   def getValue(key: String): Concrete = {
-//    key match {
-//      case Memory.KeyPattern(memoryName, portName, fieldName) =>
-//        if(fieldName == "data") {
-//          log(s"resolving: rhs memory data reference, dispatching implicit dependencies")
-//          circuitState.getMemoryDependencies(memoryName, portName).foreach { dependentKey =>
-//            if(toResolve.contains(dependentKey)) {
-//              resolveDependency(dependentKey)
-//            }
-//          }
-//        }
-//        else {
-//          log("resolving memory key")
-//        }
-//      case _ =>
-//    }
     circuitState.getValue(key) match {
       case Some(value) => value
       case _ =>
@@ -369,31 +356,6 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
   def handlePrimOps() {}
 
   private def resolveDependency(key: String): Concrete = {
-    if(toResolve.contains(key)) {
-      toResolve -= key
-    }
-    else {
-      key match {
-        case Memory.KeyPattern(memoryName, portName, fieldName) =>
-          if(fieldName == "data") {
-            log(s"resolving: rhs memory data reference, dispatching implicit dependencies")
-            circuitState.getMemoryDependencies(memoryName, portName).foreach { dependentKey =>
-              if(toResolve.contains(dependentKey)) {
-                resolveDependency(dependentKey)
-              }
-            }
-          }
-          else {
-            log("resolving memory key")
-          }
-        case _ =>
-          // throw new InterruptedException(s"Error: attempt to resolve dependency for unknown key $key")
-      }
-    }
-
-//    toResolve -= key
-
-//    log(s"resolveDependency:start: $key")
     resolveDepth += 1
 
     val value = if(circuitState.isInput(key)) {
@@ -412,27 +374,17 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
     circuitState.setValue(key, value)
 
     resolveDepth -= 1
-//    log(s"resolveDependency:done: $key <= $value")
 
     value
   }
 
-  def resolveDependencies(specificDependencies: Seq[String]): Unit = {
-    toResolve = defaultKeysToResolve.clone()
+  def resolveDependencies(specificDependencies: Iterable[String]): Unit = {
+    val toResolve = if(keyOrderInitialized) keyOrder else defaultKeysToResolve
 
-    val memKeys = toResolve.filter { circuitState.isMemory }
-    toResolve --= memKeys
-
-    while (memKeys.nonEmpty) {
-      val key = memKeys.head
-      resolveDependency(key)
-      memKeys -= key
-    }
-
-    while (toResolve.nonEmpty) {
-      val key = toResolve.head
+    for(key <- toResolve) {
       resolveDependency(key)
     }
+
     if(! keyOrderInitialized) {
       println(s"Key order ${keyOrder.mkString("\n")}")
       keyOrderInitialized = true
