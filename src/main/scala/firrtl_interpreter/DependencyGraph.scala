@@ -3,54 +3,117 @@
 package firrtl_interpreter
 
 import firrtl._
+import firrtl.antlr.FIRRTLParser.CircuitContext
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
+//noinspection ScalaStyle
 object DependencyGraph extends SimpleLogger {
-  def apply(circuit: Circuit): DependencyGraph = {
-    val module = circuit.modules.head
 
-    val dependencyGraph = new DependencyGraph(circuit, module)
+  def findTopLevelModule(moduleName: String, circuit: Circuit): Module = {
+    circuit.modules.find(module => module.name == moduleName) match {
+      case Some(module) =>
+        module
+      case _ =>
+        throw InterpreterException(s"Could not find top level module in ${moduleName}")
+    }
+  }
 
-    def getDepsStmt(s: Stmt): Stmt = s match {
+  def processDependencyStatements(modulePrefix: String, s: Stmt, dependencyGraph: DependencyGraph): Stmt = {
+    def expand(name: String): String = if(modulePrefix.isEmpty) name else modulePrefix + "." + name
+
+    def renameExpression(expression: Expression): Expression = {
+      val result = try {
+        expression match {
+          case Mux(condition, trueExpression, falseExpression, tpe) =>
+            Mux(
+              renameExpression(condition),
+              renameExpression(falseExpression),
+              renameExpression(trueExpression),
+              tpe
+            )
+          case WRef(name, tpe, kind, gender) => WRef(expand(name), tpe, kind, gender)
+          case WSubField(expression, name, tpe, gender) => WSubField(renameExpression(expression), name, tpe, gender)
+          case WSubIndex(expression, value, tpe, gender) => WSubIndex(renameExpression(expression), value, tpe, gender)
+          case ValidIf(condition, value, tpe) => ValidIf(renameExpression(condition), renameExpression(value), tpe)
+          case DoPrim(op, args, const, tpe) =>
+            DoPrim(op, args.map {case expression => renameExpression(expression)}, const, tpe)
+          case c: UIntValue => c
+          case c: SIntValue => c
+          case _ =>
+            throw new Exception(s"renameExpression:error: unhandled expression $expression")
+        }
+      }
+      catch {
+        case ie: Exception =>
+          println(s"Error: ${ie.getMessage}")
+          throw ie
+        case ie: AssertionError =>
+          println(s"Error: ${ie.getMessage}")
+          throw ie
+      }
+
+      result
+    }
+
+    s match {
       case begin: Begin =>
-        // println(s"got a begin $begin")
-        begin.stmts map getDepsStmt
+        begin.stmts.map { case subStatement =>
+          processDependencyStatements(modulePrefix, subStatement, dependencyGraph)
+        }
         begin
       case con: Connect =>
         con.loc match {
-          case WRef(name,_,_,_) => dependencyGraph(name) = con.exp
-          case (_: WSubField | _: WSubIndex) =>
-            val name = con.loc.serialize
-            dependencyGraph(name) = con.exp
+          case WRef(name, _, _, _) => dependencyGraph(expand(name)) = renameExpression(con.exp)
+          case (_: WSubField | _: WSubIndex) => dependencyGraph(expand(con.loc.serialize)) = renameExpression(con.exp)
         }
         con
+      case WDefInstance(info, instanceName, moduleName, tpe) =>
+        println(s"Instantiating $instanceName of $moduleName")
+        val subModule = findTopLevelModule(moduleName, dependencyGraph.circuit)
+        processModule(instanceName, subModule, dependencyGraph)
+        s
       case DefNode(_, name, expression) =>
         log(s"declaration:node: $s")
-        dependencyGraph.recordName(name)
-        dependencyGraph(name) = expression
+        dependencyGraph.recordName(expand(name))
+        dependencyGraph(expand(name)) = renameExpression(expression)
         s
-      case DefWire(_, name, _) =>
+      case DefWire(info, name, tpe) =>
         log(s"declaration:node: $s")
-        dependencyGraph.recordName(name)
+        dependencyGraph.recordName(expand(name))
+        dependencyGraph.recordType(expand(name), tpe)
         s
-      case DefRegister(_, name, tpe, _, resetExpression, initValueExpression) =>
+      case DefRegister(info, name, tpe, clockExpression, resetExpression, initValueExpression) =>
         log(s"declaration:reg: $s")
-        dependencyGraph.registerNames += name
-        dependencyGraph.recordName(name)
-        dependencyGraph.recordType(name, tpe)
-        dependencyGraph.registers += s.asInstanceOf[DefRegister]
+        val renamedDefRegister = DefRegister(
+          info, name, tpe,
+          renameExpression(clockExpression),
+          renameExpression(resetExpression),
+          renameExpression(initValueExpression)
+        )
+        dependencyGraph.registerNames += expand(name)
+        dependencyGraph.recordName(expand(name))
+        dependencyGraph.recordType(expand(name), tpe)
+        dependencyGraph.registers += renamedDefRegister
         s
       case defMemory: DefMemory =>
         log(s"declaration:mem $defMemory")
+        //TODO: the name of the memory needs to be expanded, if memories are still present in firrtl
         dependencyGraph.addMemory(defMemory)
         s
-      case stopStatement: Stop =>
-        dependencyGraph.addStop(stopStatement)
+      case IsInvalid(info, expression) =>
+        IsInvalid(info, renameExpression(expression))
+      case Stop(info, ret, clkExpression, enableExpression) =>
+        dependencyGraph.addStop(Stop(info, ret, renameExpression(clkExpression), renameExpression(enableExpression)))
         s
-      case printStatement: Print =>
-        dependencyGraph.addPrint(printStatement)
+      case Print(info, stringLiteral, argExpressions, clkExpression, enableExpression) =>
+        dependencyGraph.addPrint(Print(
+          info, stringLiteral,
+          argExpressions.map { case expression => renameExpression(expression) },
+          renameExpression(clkExpression),
+          renameExpression(enableExpression)
+        ))
         s
       case e: Empty =>
         s
@@ -61,28 +124,59 @@ object DependencyGraph extends SimpleLogger {
         println(s"TODO: Unhandled statement $s")
         s
     }
+  }
 
+  def processModule(modulePrefix: String, module: Module, dependencyGraph: DependencyGraph): Unit = {
     module match {
       case i: InModule =>
         for(port <- i.ports) {
-          dependencyGraph.nameToType(port.name) = port.tpe
-          if(port.direction == INPUT) {
-            dependencyGraph.inputPorts += port.name
-            dependencyGraph.recordName(port.name)
+          if(modulePrefix.isEmpty) {
+            dependencyGraph.nameToType(port.name) = port.tpe
+            if (port.direction == INPUT) {
+              dependencyGraph.inputPorts += port.name
+              dependencyGraph.recordName(port.name)
+            }
+            else if (port.direction == OUTPUT) {
+              dependencyGraph.outputPorts += port.name
+              dependencyGraph.recordName(port.name)
+            }
           }
-          else if(port.direction == OUTPUT) {
-            dependencyGraph.outputPorts += port.name
-            dependencyGraph.recordName(port.name)
+          else {
+            dependencyGraph.nameToType(modulePrefix + "." + port.name) = port.tpe
+            dependencyGraph.recordName(modulePrefix + "." + port.name)
           }
         }
-        getDepsStmt(i.body)
+        processDependencyStatements(modulePrefix, i.body, dependencyGraph)
       case e: ExModule => // Do nothing
+    }
+  }
+
+  def apply(circuit: Circuit): DependencyGraph = {
+    val module = findTopLevelModule(circuit.main, circuit)
+
+    val dependencyGraph = new DependencyGraph(circuit, module)
+
+    setVerbose(true)
+
+    processModule("", module, dependencyGraph)
+
+    for(name <- dependencyGraph.validNames) {
+      if(! dependencyGraph.nameToExpression.contains(name)) {
+        val defaultValue = dependencyGraph.nameToType(name) match {
+          case UIntType(width) => UIntValue(0, width)
+          case SIntType(width) => SIntValue(0, width)
+          case ClockType()     => UIntValue(0, IntWidth(1))
+          case _ =>
+            throw new Exception(s"error can't find default value for $name.type = ${dependencyGraph.nameToType(name)}")
+        }
+        dependencyGraph.nameToExpression(name) = defaultValue
+      }
     }
 
     log(s"For module ${module.name} dependencyGraph =")
     dependencyGraph.nameToExpression.keys.toSeq.sorted foreach { case k =>
       val v = dependencyGraph.nameToExpression(k)
-      log(s"  $k -> (" + v.toString + ")")
+      log(s"  $k -> (" + v.toString.take(80) + ")")
     }
     dependencyGraph
   }
