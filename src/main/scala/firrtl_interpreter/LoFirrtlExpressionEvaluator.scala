@@ -26,8 +26,8 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
       s"${dependencyGraph.addKind(lhsOpt.getOrElse("     "))} -> ${expression.serialize}"
     }
   }
-  val expressionStack = new ArrayBuffer[StackItem]
-  val stackKeys = new mutable.HashSet[String]
+
+  val evaluationStack = new ExpressionExecutionStack(dependencyGraph)
 
   var defaultKeysToResolve = {
     val keys = new mutable.HashSet[String]
@@ -244,21 +244,7 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
       }
     )
     indent()
-    expressionStack += StackItem(leftHandSideOption, expression)
-    leftHandSideOption.foreach { expressionKey =>
-      if(stackKeys.contains(expressionKey)) {
-        println(s"key ${expressionKey} already in stack of size ${expressionStack.length}")
-        expressionStack.filter(_.lhsOpt.nonEmpty).zipWithIndex.foreach { case (entry,index) =>
-          println(f"$index%4d $entry")
-        }
-        throw new InterpreterException(s"Expression key $expressionKey already in stack")
-      }
-      stackKeys += expressionKey
-    }
-    if(expressionStack.length > 1000) {
-      println(expressionStack.flatMap { _.lhsOpt }.mkString("\n"))
-      throw new InterpreterException(s"Expression stack too deep")
-    }
+    evaluationStack.push(leftHandSideOption, expression)
 
     val result = try {
       expression match {
@@ -357,26 +343,17 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
         throw ie
     }
 
-    expressionStack.remove(expressionStack.size-1)
+    val lastEvaluation = evaluationStack.pop()
     dedent()
-    log(
-      leftHandSideOption match {
-        case Some(key) => s"evaluates to ${leftHandSideOption.getOrElse("")} <= $result"
-        case _         => s"evaluates to $result"
-      }
-    )
+    log(lastEvaluation.toString)
 
     result
   }
 
   def showStack(): Unit = {
     println("Expression Evaluation stack")
-    expressionStack.foreach { case StackItem(lhsOpt, expr) =>
-      println(s"${lhsOpt.getOrElse("???")} <= ${expr.serialize.take(100)}")
-    }
+    println(evaluationStack.stackListing)
   }
-
-  def handlePrimOps() {}
 
   private def resolveDependency(key: String): Concrete = {
     resolveDepth += 1
