@@ -80,7 +80,7 @@ trait Concrete {
   // Casting     TODO: I don't think this is done right, need to look at top bit each way
   def asUInt: ConcreteUInt = ConcreteUInt(this.value, this.width)
   def asSInt: ConcreteSInt = {
-    ConcreteSInt(this.value, this.width)
+    ConcreteSInt(if(this.value == 1 && this.width == 1) -1 else this.value, this.width)
   }
   def asClock: ConcreteClock = ConcreteClock(boolToBigInt((this.value & BigInt(1)) > BigInt(0)))
   // Shifting
@@ -116,7 +116,7 @@ trait Concrete {
   }
   def >>(that: BigInt): Concrete = >>(that.toInt)
   def >>(shift: Int): Concrete = {
-    assert(shift > 0, s"ERROR:$this >> $shift $shift must be >= 0")
+    assert(shift >= 0, s"ERROR:$this >> $shift $shift must be >= 0")
     assert(shift < this.width, s"ERROR:$this >> $shift $shift must be >= 0")
     this match {
       case ConcreteUInt(thisValue, thisWidth) => ConcreteUInt(this.value >> shift, thisWidth - shift)

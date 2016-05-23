@@ -133,7 +133,13 @@ case class CircuitState(
       case Some(value) => Some(value)
       case _=>
         key match {
-          case Memory.KeyPattern(memoryName, _, _) => Some(memories(memoryName).getValue(key))
+          case Memory.KeyPattern(memoryName, _, _) =>
+            if(memories.contains(memoryName)) {
+              Some(memories(memoryName).getValue(key))
+            }
+            else {
+              None
+            }
           case _ => None
         }
     }

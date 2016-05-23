@@ -19,7 +19,8 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
 
   var evaluateAll = false
 
-  val expressionStack = new ArrayBuffer[Expression]
+  case class StackItem(lhsOpt: Option[String], expression: Expression)
+  val expressionStack = new ArrayBuffer[StackItem]
 
   var defaultKeysToResolve = {
     val keys = new mutable.HashSet[String]
@@ -240,7 +241,7 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
       }
     )
     indent()
-    expressionStack += expression
+    expressionStack += StackItem(leftHandSideOption, expression)
 
     val result = try {
       expression match {
@@ -256,10 +257,10 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
           v.forceWidth(tpe)
         case WRef(name, tpe, kind, gender) => getValue(name).forceWidth(tpe)
         case ws: WSubField =>
-          val name = expression.serialize
+          val name = ws.serialize
           getValue(name).forceWidth(ws.tpe)
         case ws: WSubIndex =>
-          val name = expression.serialize
+          val name = ws.serialize
           getValue(name).forceWidth(ws.tpe)
         case ValidIf(condition, value, tpe) =>
           if (evaluate(condition).value > 0) {
@@ -331,13 +332,11 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
     catch {
       case ie: Exception =>
         println(s"Error: ${ie.getMessage}")
-        println("Expression Evaluation stack")
-        println(expressionStack.mkString("  ", "\n  ", ""))
+        showStack()
         throw ie
       case ie: AssertionError =>
         println(s"Error: ${ie.getMessage}")
-        println("Expression Evaluation stack")
-        println(expressionStack.mkString("  ", "\n  ", ""))
+        showStack()
         throw ie
     }
 
@@ -353,6 +352,13 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
     result
   }
 
+  def showStack(): Unit = {
+    println("Expression Evaluation stack")
+    expressionStack.foreach { case StackItem(lhsOpt, expr) =>
+      println(s"${lhsOpt.getOrElse("???")} <= ${expr.serialize.take(100)}")
+    }
+  }
+
   def handlePrimOps() {}
 
   private def resolveDependency(key: String): Concrete = {
@@ -360,6 +366,9 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
 
     val value = if(circuitState.isInput(key)) {
       circuitState.getValue(key).get
+    }
+    else if(dependencyGraph.memoryKeys.contains(key)) {
+      dependencyGraph.memoryKeys(key).getValue(key)
     }
     else {
       val expression = dependencyGraph.nameToExpression(key)

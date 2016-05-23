@@ -376,5 +376,5 @@ object Memory {
       case _ => key
     }
   }
-  val KeyPattern = """([^\.]*)\.([^\.]*)\.([^\.]*)""".r
+  val KeyPattern = """(.*)\.([^\.]*)\.([^\.]*)""".r
 }

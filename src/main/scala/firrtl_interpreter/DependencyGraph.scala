@@ -3,7 +3,6 @@
 package firrtl_interpreter
 
 import firrtl._
-import firrtl.antlr.FIRRTLParser.CircuitContext
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -34,8 +33,10 @@ object DependencyGraph extends SimpleLogger {
               tpe
             )
           case WRef(name, tpe, kind, gender) => WRef(expand(name), tpe, kind, gender)
-          case WSubField(expression, name, tpe, gender) => WSubField(renameExpression(expression), name, tpe, gender)
-          case WSubIndex(expression, value, tpe, gender) => WSubIndex(renameExpression(expression), value, tpe, gender)
+          case WSubField(subExpression, name, tpe, gender) =>
+            WSubField(renameExpression(subExpression), name, tpe, gender)
+          case WSubIndex(subExpression, value, tpe, gender) =>
+            WSubIndex(renameExpression(subExpression), value, tpe, gender)
           case ValidIf(condition, value, tpe) => ValidIf(renameExpression(condition), renameExpression(value), tpe)
           case DoPrim(op, args, const, tpe) =>
             DoPrim(op, args.map {case expression => renameExpression(expression)}, const, tpe)
@@ -57,6 +58,10 @@ object DependencyGraph extends SimpleLogger {
       result
     }
 
+    def showNode(kind: String, name: String, expression: String, renamedExpression: String = ""): Unit = {
+      log(s"declaration:$kind:$name $expression $renamedExpression")
+    }
+
     s match {
       case begin: Begin =>
         begin.stmts.map { case subStatement =>
@@ -70,22 +75,25 @@ object DependencyGraph extends SimpleLogger {
         }
         con
       case WDefInstance(info, instanceName, moduleName, tpe) =>
-        println(s"Instantiating $instanceName of $moduleName")
         val subModule = findTopLevelModule(moduleName, dependencyGraph.circuit)
-        processModule(instanceName, subModule, dependencyGraph)
+        val newPrefix = if(modulePrefix.isEmpty) instanceName else modulePrefix + "." + instanceName
+        showNode("WDefInstance", instanceName, moduleName, s"prefix now $newPrefix")
+        processModule(newPrefix, subModule, dependencyGraph)
         s
       case DefNode(_, name, expression) =>
-        log(s"declaration:node: $s")
+        showNode("DefNode", name, expression.serialize, renameExpression(expression).serialize)
         dependencyGraph.recordName(expand(name))
         dependencyGraph(expand(name)) = renameExpression(expression)
         s
       case DefWire(info, name, tpe) =>
-        log(s"declaration:node: $s")
+        showNode("DefWire", name, "")
         dependencyGraph.recordName(expand(name))
         dependencyGraph.recordType(expand(name), tpe)
         s
       case DefRegister(info, name, tpe, clockExpression, resetExpression, initValueExpression) =>
-        log(s"declaration:reg: $s")
+        showNode("DefRegister", name, s"clock <- ${clockExpression.serialize}", renameExpression(clockExpression).serialize)
+        showNode("DefRegister", name, s"clock <- ${resetExpression.serialize}", renameExpression(resetExpression).serialize)
+        showNode("DefRegister", name, s"clock <- ${initValueExpression.serialize}", renameExpression(initValueExpression).serialize)
         val renamedDefRegister = DefRegister(
           info, name, tpe,
           renameExpression(clockExpression),
@@ -98,9 +106,10 @@ object DependencyGraph extends SimpleLogger {
         dependencyGraph.registers += renamedDefRegister
         s
       case defMemory: DefMemory =>
-        log(s"declaration:mem $defMemory")
+        showNode("DefMemory", defMemory.name, "")
         //TODO: the name of the memory needs to be expanded, if memories are still present in firrtl
-        dependencyGraph.addMemory(defMemory)
+        val newDefMemory = defMemory.copy(name = expand(defMemory.name))
+        dependencyGraph.addMemory(newDefMemory)
         s
       case IsInvalid(info, expression) =>
         IsInvalid(info, renameExpression(expression))
@@ -175,8 +184,8 @@ object DependencyGraph extends SimpleLogger {
 
     log(s"For module ${module.name} dependencyGraph =")
     dependencyGraph.nameToExpression.keys.toSeq.sorted foreach { case k =>
-      val v = dependencyGraph.nameToExpression(k)
-      log(s"  $k -> (" + v.toString.take(80) + ")")
+      val v = dependencyGraph.nameToExpression(k).serialize
+      log(s"  $k -> (" + v.toString.take(100) + ")")
     }
     dependencyGraph
   }
@@ -189,6 +198,7 @@ class DependencyGraph(val circuit: Circuit, val module: Module) {
   val registerNames    = new mutable.HashSet[String]
   val registers        = new ArrayBuffer[DefRegister]
   val memories         = new mutable.HashMap[String, Memory]
+  val memoryKeys       = new mutable.HashMap[String, Memory]
   val stops            = new ArrayBuffer[Stop]
   val prints           = new ArrayBuffer[Print]
 
@@ -207,8 +217,14 @@ class DependencyGraph(val circuit: Circuit, val module: Module) {
   def getNameSet: mutable.HashSet[String] = mutable.HashSet(nameToExpression.keys.toSeq:_*)
   def addStop(stopStatement: Stop): Unit = { stops += stopStatement }
   def addPrint(printStatement: Print): Unit = { prints += printStatement }
-  def addMemory(defMemory: DefMemory): Unit = {
-    memories(defMemory.name) = Memory(defMemory)
+  def addMemory(defMemory: DefMemory): Memory = {
+    val newMemory = Memory(defMemory)
+    memories(defMemory.name) = newMemory
+    for(portKey <- newMemory.getAllFieldDependencies) {
+      println(s"Adding specific memory port $portKey to memoryKeys")
+      memoryKeys(portKey) = newMemory
+    }
+    newMemory
   }
 
   def hasInput(name: String): Boolean = inputPorts.contains(name)
