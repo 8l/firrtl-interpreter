@@ -293,7 +293,9 @@ case class ConcreteSInt(val value: BigInt, val width: Int) extends Concrete {
   else {
     val bitsRequired = requiredBits(value)
     if ((width > 0) && (bitsRequired > width)) {
-      throw new InterpreterException(s"error: ConcreteSInt($value, $width) bad width $width needs ${requiredBits(value.toInt)}")
+      throw new InterpreterException(
+        s"error: ConcreteSInt($value, $width) bad width $width needs ${requiredBits(value.toInt)}"
+      )
     }
   }
 
@@ -307,8 +309,8 @@ case class ConcreteClock(val value: BigInt) extends Concrete {
   val width = 1
 
   def forceWidth(width: Int): ConcreteClock = {
-    if(width == 1) this
-    else throw new InterpreterException(s"withWidth($width) not supported for $this")
+    if(width == 1) { this }
+    else { throw new InterpreterException(s"withWidth($width) not supported for $this") }
   }
   def forceWidth(tpe: Type): ConcreteClock = forceWidth(typeToWidth(tpe))
 }

@@ -43,10 +43,13 @@ class FirrtlTerp(ast: Circuit) extends SimpleLogger {
   val dependencyGraph    = DependencyGraph(loweredAst)
 
   var circuitState = CircuitState(dependencyGraph)
+  println("Circuit state created")
+
   val evaluator = new LoFirrtlExpressionEvaluator(
     dependencyGraph = dependencyGraph,
     circuitState = circuitState
   )
+  println("evaluator created")
 
   def getValue(name: String): Concrete = {
     assert(dependencyGraph.validNames.contains(name),

@@ -18,3 +18,6 @@ libraryDependencies ++= Seq(
   "org.scala-lang.modules" % "scala-jline" % "2.12.1"
 )
 
+//javaOptions in run ++= Seq(
+    //"-Xms2G", "-Xmx4G", "-XX:MaxPermSize=1024M", "-XX:+UseConcMarkSweepGC")
+

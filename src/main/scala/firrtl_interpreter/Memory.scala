@@ -41,6 +41,8 @@ class Memory(
   val addressWidth = requiredBits(depth)
   val bigDepth     = BigInt(depth)
 
+  val maxMemoryInDefaultDisplay = 20
+
   assert(writeLatency == 1, s"Interpreter memory $name write latency $writeLatency not supported, must be 1")
   assert(readLatency <  2,  s"Interpreter memory $name read latency $readLatency not supported, must be 0 or 1")
   assert(readLatency >= 0,  s"Interpreter memory $name read latency $readLatency not supported, must be 0 or 1")
@@ -54,7 +56,9 @@ class Memory(
   }
   val writePorts:     Array[WritePort]     = writers.map(writer => ports(writer).asInstanceOf[WritePort]).toArray
   val readPorts:      Array[ReadPort]      = readers.map(reader => ports(reader).asInstanceOf[ReadPort]).toArray
-  val readWritePorts: Array[ReadWritePort] = readWriters.map(readWriter => ports(readWriter).asInstanceOf[ReadWritePort]).toArray
+  val readWritePorts: Array[ReadWritePort] = readWriters.map { readWriter =>
+    ports(readWriter).asInstanceOf[ReadWritePort]
+  }.toArray
 
   val dataStore: Array[Concrete] = Array.fill(depth)(Concrete(dataType))
 
@@ -75,7 +79,7 @@ class Memory(
     * @param key full ram.port.field specifier
     * @param concreteValue current value
     */
-  def setValue(key: String, concreteValue: Concrete) = {
+  def setValue(key: String, concreteValue: Concrete): Unit = {
     key match {
       case KeyPattern(memoryName, portName, fieldName) =>
         assert(name == memoryName, s"Error:bad dispatch memory($name).setValue($key, $concreteValue)")
@@ -112,7 +116,7 @@ class Memory(
     readPorts.mkString(" rp:", ",", "") +
     writePorts.mkString(" wp:", ",", " ") +
     readWritePorts.mkString(" rwp:", ",", " ") +
-      (0 until depth.min(20)).map( a => dataStore(a).value).mkString(",")
+      (0 until depth.min(maxMemoryInDefaultDisplay)).map(a => dataStore(a).value).mkString(",")
   }
 
   trait PipeLineElement
@@ -211,7 +215,7 @@ class Memory(
         Array.fill(latency)(elementFromSnapshot)
     }
 
-    def elementFromSnapshot = {
+    def elementFromSnapshot: WritePipeLineElement = {
       WritePipeLineElement(enable, address, data, mask)
     }
 
@@ -279,7 +283,7 @@ class Memory(
     val writePipeLine : ArrayBuffer[WritePipeLineElement] = {
       ArrayBuffer.fill[WritePipeLineElement](writeLatency)(writeElementFromSnapshot)
     }
-    def writeElementFromSnapshot = {
+    def writeElementFromSnapshot: WritePipeLineElement = {
       WritePipeLineElement(enable && writeMode, address, data, mask)
     }
     def inputHasChanged(): Unit = {

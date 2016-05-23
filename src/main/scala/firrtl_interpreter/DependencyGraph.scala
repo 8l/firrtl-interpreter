@@ -82,11 +82,13 @@ object DependencyGraph extends SimpleLogger {
         s
       case DefNode(_, name, expression) =>
         showNode("DefNode", name, expression.serialize, renameExpression(expression).serialize)
+        dependencyGraph.nodes += expand(name)
         dependencyGraph.recordName(expand(name))
         dependencyGraph(expand(name)) = renameExpression(expression)
         s
       case DefWire(info, name, tpe) =>
         showNode("DefWire", name, "")
+        dependencyGraph.wires += expand(name)
         dependencyGraph.recordName(expand(name))
         dependencyGraph.recordType(expand(name), tpe)
         s
@@ -153,6 +155,7 @@ object DependencyGraph extends SimpleLogger {
           else {
             dependencyGraph.nameToType(modulePrefix + "." + port.name) = port.tpe
             dependencyGraph.recordName(modulePrefix + "." + port.name)
+            dependencyGraph.inlinedPorts += modulePrefix + "." + port.name
           }
         }
         processDependencyStatements(modulePrefix, i.body, dependencyGraph)
@@ -165,7 +168,7 @@ object DependencyGraph extends SimpleLogger {
 
     val dependencyGraph = new DependencyGraph(circuit, module)
 
-    setVerbose(true)
+//    setVerbose(true)
 
     processModule("", module, dependencyGraph)
 
@@ -187,6 +190,7 @@ object DependencyGraph extends SimpleLogger {
       val v = dependencyGraph.nameToExpression(k).serialize
       log(s"  $k -> (" + v.toString.take(100) + ")")
     }
+    println(s"End of dependency graph")
     dependencyGraph
   }
 }
@@ -204,6 +208,9 @@ class DependencyGraph(val circuit: Circuit, val module: Module) {
 
   val inputPorts       = new mutable.HashSet[String]
   val outputPorts      = new mutable.HashSet[String]
+  val nodes            = new mutable.HashSet[String]
+  val wires            = new mutable.HashSet[String]
+  val inlinedPorts     = new mutable.HashSet[String]
 
   def update(key: String, e: Expression): Unit = nameToExpression(key) = e
   def apply(key: String): Option[Expression] = {
@@ -229,4 +236,31 @@ class DependencyGraph(val circuit: Circuit, val module: Module) {
 
   def hasInput(name: String): Boolean = inputPorts.contains(name)
   def hasOutput(name: String): Boolean = outputPorts.contains(name)
+
+  def addKind(key: String): String = {
+    if(registerNames.contains(key)) {
+      key + ":Reg"
+    }
+    else if(memoryKeys.contains(key)) {
+      key + ":MemIO"
+    }
+    else if(inputPorts.contains(key)) {
+      key + ":Input"
+    }
+    else if(outputPorts.contains(key)) {
+      key + ":Output"
+    }
+    else if(nodes.contains(key)) {
+      key + ":Node"
+    }
+    else if(wires.contains(key)) {
+      key + ":Wire"
+    }
+    else if(inlinedPorts.contains(key)) {
+      key + ":InlinedPort"
+    }
+    else {
+      key
+    }
+  }
 }

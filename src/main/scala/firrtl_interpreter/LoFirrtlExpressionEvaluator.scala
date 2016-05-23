@@ -19,8 +19,15 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
 
   var evaluateAll = false
 
-  case class StackItem(lhsOpt: Option[String], expression: Expression)
+  setVerbose(true)
+
+  case class StackItem(lhsOpt: Option[String], expression: Expression) {
+    override def toString: String = {
+      s"${dependencyGraph.addKind(lhsOpt.getOrElse("     "))} -> ${expression.serialize}"
+    }
+  }
   val expressionStack = new ArrayBuffer[StackItem]
+  val stackKeys = new mutable.HashSet[String]
 
   var defaultKeysToResolve = {
     val keys = new mutable.HashSet[String]
@@ -31,7 +38,6 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
     keys ++= dependencyGraph.outputPorts
 
     keys ++= dependencyGraph.registerNames
-    println(s"resolveDependencies: keys $keys")
     keys.toArray
   }
 
@@ -233,15 +239,26 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
   def evaluate(expression: Expression, leftHandSideOption: Option[String] = None): Concrete = {
     log(
       leftHandSideOption match {
-        case Some(key) => s"evaluate    " +
-          s"" +
-          s"" +
-          s" ${leftHandSideOption.getOrElse("")} <= ${expression.serialize}"
+        case Some(key) => s"evaluate     ${leftHandSideOption.getOrElse("")} <= ${expression.serialize}"
         case _         => s"evaluate     ${expression.serialize}"
       }
     )
     indent()
     expressionStack += StackItem(leftHandSideOption, expression)
+    leftHandSideOption.foreach { expressionKey =>
+      if(stackKeys.contains(expressionKey)) {
+        println(s"key ${expressionKey} already in stack of size ${expressionStack.length}")
+        expressionStack.filter(_.lhsOpt.nonEmpty).zipWithIndex.foreach { case (entry,index) =>
+          println(f"$index%4d $entry")
+        }
+        throw new InterpreterException(s"Expression key $expressionKey already in stack")
+      }
+      stackKeys += expressionKey
+    }
+    if(expressionStack.length > 1000) {
+      println(expressionStack.flatMap { _.lhsOpt }.mkString("\n"))
+      throw new InterpreterException(s"Expression stack too deep")
+    }
 
     val result = try {
       expression match {
