@@ -28,8 +28,8 @@ object DependencyGraph extends SimpleLogger {
           case Mux(condition, trueExpression, falseExpression, tpe) =>
             Mux(
               renameExpression(condition),
-              renameExpression(falseExpression),
               renameExpression(trueExpression),
+              renameExpression(falseExpression),
               tpe
             )
           case WRef(name, tpe, kind, gender) => WRef(expand(name), tpe, kind, gender)
@@ -221,9 +221,9 @@ class DependencyGraph(val circuit: Circuit, val module: Module) {
   def recordName(key: String): Unit = validNames += key
   def recordType(key: String, tpe: Type): Unit = {nameToType(key) = tpe}
   def getType(key: String): Type = nameToType(key)
-  def getNameSet: mutable.HashSet[String] = mutable.HashSet(nameToExpression.keys.toSeq:_*)
   def addStop(stopStatement: Stop): Unit = { stops += stopStatement }
   def addPrint(printStatement: Print): Unit = { prints += printStatement }
+
   def addMemory(defMemory: DefMemory): Memory = {
     val newMemory = Memory(defMemory)
     memories(defMemory.name) = newMemory

@@ -152,8 +152,7 @@ class FirrtlRepl {
         def usage: (String, String) = ("run [linesToRun|all|reset]", "run loaded script")
         override def completer: Option[ArgumentCompleter] = {
           Some(new ArgumentCompleter(
-            new StringsCompleter({"script"}),
-            new FileNameCompleter
+            new StringsCompleter({"run"})
           ))
         }
         def run(args: Array[String]): Unit = {

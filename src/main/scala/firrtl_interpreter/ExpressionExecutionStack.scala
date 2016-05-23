@@ -43,6 +43,8 @@ class ExpressionExecutionStack(dependencyGraph: DependencyGraph) {
   }
 
   def pop(): StackItem = {
-    expressionStack.remove(expressionStack.length-1)
+    val lastItem = expressionStack.remove(expressionStack.length-1)
+    lastItem.lhsOpt.foreach { key => stackKeys -= key }
+    lastItem
   }
 }

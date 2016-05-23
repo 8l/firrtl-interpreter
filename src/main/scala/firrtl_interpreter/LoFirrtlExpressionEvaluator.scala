@@ -19,6 +19,8 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
 
   var evaluateAll = false
 
+  var exceptionCaught = false
+
   setVerbose(true)
 
   case class StackItem(lhsOpt: Option[String], expression: Expression) {
@@ -334,18 +336,24 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
     }
     catch {
       case ie: Exception =>
-        println(s"Error: ${ie.getMessage}")
-        showStack()
+        if(! exceptionCaught) {
+          println(s"Exception during evaluation: ${ie.getMessage}")
+          showStack()
+          exceptionCaught = true
+        }
         throw ie
       case ie: AssertionError =>
-        println(s"Error: ${ie.getMessage}")
-        showStack()
+        if(! exceptionCaught) {
+          println(s"Assertion during evaluation: ${ie.getMessage}")
+          showStack()
+          exceptionCaught = true
+        }
         throw ie
     }
 
     val lastEvaluation = evaluationStack.pop()
     dedent()
-    log(lastEvaluation.toString)
+    log(s"evaluator:returns:$result")
 
     result
   }
@@ -384,6 +392,7 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
   def resolveDependencies(specificDependencies: Iterable[String]): Unit = {
     val toResolve: Iterable[String] = if(keyOrderInitialized) keyOrder else defaultKeysToResolve
 
+    exceptionCaught = false
     for(key <- toResolve) {
       resolveDependency(key)
     }
