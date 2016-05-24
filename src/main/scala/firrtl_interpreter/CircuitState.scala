@@ -28,7 +28,9 @@ object CircuitState {
     }.toSeq:_*)
   }
 
-  def makePortToConcreteValueMap(dependencyGraph: DependencyGraph, direction: Direction) = {
+  def makePortToConcreteValueMap(
+                                  dependencyGraph: DependencyGraph,
+                                  direction: Direction): mutable.Map[String, Concrete] = {
     mutable.Map(dependencyGraph.module.ports.filter(_.direction == direction).map { port =>
       port.name -> TypeInstanceFactory(port.tpe)
     }: _*)
@@ -167,7 +169,7 @@ case class CircuitState(
     def showConcreteValues(msg: String, m: Map[String, Concrete]): String = {
       m.keys.toSeq.sorted.map { case key =>
         s"$key=${m(key).value}"
-      }.mkString(msg+prefix, separator, postfix)
+      }.mkString(msg + prefix, separator, postfix)
     }
     s"""
        |CircuitState $stateCounter (${if(isStale) "STALE" else "FRESH"})

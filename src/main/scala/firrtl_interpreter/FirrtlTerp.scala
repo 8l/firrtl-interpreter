@@ -83,8 +83,8 @@ class FirrtlTerp(ast: Circuit) extends SimpleLogger {
     circuitState.setValue(name, concreteValue)
   }
 
-  def hasInput(name: String)  = dependencyGraph.hasInput(name)
-  def hasOutput(name: String) = dependencyGraph.hasOutput(name)
+  def hasInput(name: String): Boolean  = dependencyGraph.hasInput(name)
+  def hasOutput(name: String): Boolean = dependencyGraph.hasOutput(name)
 
   def evaluateCircuit(specificDependencies: Seq[String] = Seq()): Unit = {
     log(s"clear ephemera")
@@ -107,13 +107,15 @@ class FirrtlTerp(ast: Circuit) extends SimpleLogger {
     evaluateCircuit(Seq(name))
   }
 
-  def cycle(showState: Boolean = false) = {
+  def cycle(showState: Boolean = false): Unit = {
     if(circuitState.isStale) {
       log("interpreter cycle() called, state is stale, re-evaluate Circuit")
       log(circuitState.prettyString())
       evaluateCircuit()
     }
-    else log(s"interpreter cycle() called, state is fresh")
+    else {
+      log(s"interpreter cycle() called, state is fresh")
+    }
 
     circuitState.cycle()
 

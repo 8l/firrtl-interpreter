@@ -351,7 +351,7 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
         throw ie
     }
 
-    val lastEvaluation = evaluationStack.pop()
+    evaluationStack.pop()
     dedent()
     log(s"evaluator:returns:$result")
 

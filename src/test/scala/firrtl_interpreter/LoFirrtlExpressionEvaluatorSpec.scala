@@ -116,9 +116,9 @@ class LoFirrtlExpressionEvaluatorSpec extends FlatSpec with Matchers {
 
   behavior of "SHIFT_RIGHT_OP"
 
-  it should "throw assertions when parameter is zero" in {
+  it should "throw assertions when parameter is less than zero" in {
     intercept[AssertionError] {
-      evaluator.bitOps(SHIFT_RIGHT_OP, Seq(UIntValue(1, IntWidth(3))), Seq(0), UIntType(IntWidth(3)))
+      evaluator.bitOps(SHIFT_RIGHT_OP, Seq(UIntValue(1, IntWidth(3))), Seq(-1), UIntType(IntWidth(3)))
     }
     intercept[AssertionError] {
       evaluator.bitOps(SHIFT_RIGHT_OP, Seq(UIntValue(1, IntWidth(3))), Seq(4), UIntType(IntWidth(3)))

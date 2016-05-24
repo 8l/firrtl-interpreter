@@ -349,7 +349,7 @@ class FirrtlRepl {
             validVerbose ++= Seq("clear")
             val list: java.util.List[String] = validVerbose.asJava
             Some(new ArgumentCompleter(
-              new StringsCompleter({ "timimg"}),
+              new StringsCompleter({ "timing"}),
               new StringsCompleter(list)
             ))
           }
@@ -454,7 +454,7 @@ class FirrtlRepl {
   def getNextLine: String = {
     currentScript match {
       case Some(script) =>
-        script.getNextLineOption() match {
+        script.getNextLineOption match {
           case Some(line) =>
             console.println(s"$line    [${script.currentLine}:${script.fileName}]")
             console.println()

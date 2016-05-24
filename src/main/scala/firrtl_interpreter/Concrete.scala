@@ -35,33 +35,33 @@ trait Concrete {
   def /(that: Concrete): Concrete = {
     (this, that) match {
       case (ConcreteUInt(v1, w1), ConcreteUInt(v2, w2)) =>
-        if(that.value == BigInt(0)) PoisonedUInt(w1)
-        else ConcreteUInt(v1 / v2, w1)
+        if(that.value == BigInt(0)) { PoisonedUInt(w1) }
+        else { ConcreteUInt(v1 / v2, w1) }
       case (ConcreteUInt(v1, w1), ConcreteSInt(v2, w2)) =>
-        if(that.value == BigInt(0)) PoisonedSInt(w1)
-        else ConcreteSInt(v1 / v2, w1+1)
+        if(that.value == BigInt(0)) { PoisonedSInt(w1) }
+        else { ConcreteSInt(v1 / v2, w1 + 1) }
       case (ConcreteSInt(v1, w1), ConcreteUInt(v2, w2)) =>
-        if(that.value == BigInt(0)) PoisonedSInt(w1)
-        else ConcreteSInt(v1 / v2, w1)
+        if(that.value == BigInt(0)) { PoisonedSInt(w1) }
+        else { ConcreteSInt(v1 / v2, w1) }
       case (ConcreteSInt(v1, w1), ConcreteSInt(v2, w2)) =>
-        if(that.value == BigInt(0)) PoisonedSInt(w1)
-        else ConcreteSInt(v1 / v2, w1+1)
+        if(that.value == BigInt(0)) { PoisonedSInt(w1) }
+        else { ConcreteSInt(v1 / v2, w1 + 1) }
     }
   }
   def %(that: Concrete): Concrete = {
     (this, that) match {
       case (ConcreteUInt(v1, w1), ConcreteUInt(v2, w2)) =>
-        if(that.value == BigInt(0)) PoisonedUInt(w1.min(w2))
-        else ConcreteUInt(v1 % v2, w1.min(w2))
+        if(that.value == BigInt(0)) { PoisonedUInt(w1.min(w2)) }
+        else { ConcreteUInt(v1 % v2, w1.min(w2)) }
       case (ConcreteUInt(v1, w1), ConcreteSInt(v2, w2)) =>
-        if(that.value == BigInt(0)) PoisonedUInt(w1.min(w2))
-        else ConcreteUInt(v1 % v2, w1.min(w2))
+        if(that.value == BigInt(0)) { PoisonedUInt(w1.min(w2)) }
+        else { ConcreteUInt(v1 % v2, w1.min(w2)) }
       case (ConcreteSInt(v1, w1), ConcreteUInt(v2, w2)) =>
-        if(that.value == BigInt(0)) PoisonedSInt(w1.min(w2+1))
-        else ConcreteSInt(v1 % v2, w1.min(w2+1))
+        if(that.value == BigInt(0)) { PoisonedSInt(w1.min(w2 + 1)) }
+        else { ConcreteSInt(v1 % v2, w1.min(w2 + 1)) }
       case (ConcreteSInt(v1, w1), ConcreteSInt(v2, w2)) =>
-        if(that.value == BigInt(0)) PoisonedSInt(w1.min(w2))
-        else ConcreteSInt(v1 % v2, w1.min(w2))
+        if(that.value == BigInt(0)) { PoisonedSInt(w1.min(w2)) }
+        else { ConcreteSInt(v1 % v2, w1.min(w2)) }
     }
   }
   // Comparison operators
@@ -80,7 +80,7 @@ trait Concrete {
   // Casting     TODO: I don't think this is done right, need to look at top bit each way
   def asUInt: ConcreteUInt = ConcreteUInt(this.value, this.width)
   def asSInt: ConcreteSInt = {
-    ConcreteSInt(if(this.value == 1 && this.width == 1) -1 else this.value, this.width)
+    ConcreteSInt(if(this.value == Big1 && this.width == 1) -1 else this.value, this.width)
   }
   def asClock: ConcreteClock = ConcreteClock(boolToBigInt((this.value & BigInt(1)) > BigInt(0)))
   // Shifting
@@ -125,12 +125,12 @@ trait Concrete {
   }
   // Signed
   def cvt: ConcreteSInt = this match {
-    case ConcreteUInt(thisValue, thisWidth) => ConcreteSInt(thisValue, thisWidth+1)
+    case ConcreteUInt(thisValue, thisWidth) => ConcreteSInt(thisValue, thisWidth + 1)
     case ConcreteSInt(thisValue, thisWidth) => ConcreteSInt(thisValue, thisWidth)
   }
   def neg: ConcreteSInt = {
     //TODO: Is this right?
-    ConcreteSInt(-value, width+1)
+    ConcreteSInt(-value, width + 1)
   }
   def not: ConcreteUInt = this match {
     case ConcreteUInt(v, _) =>
@@ -191,7 +191,6 @@ trait Concrete {
       for(i <- 0 until bitsWanted) {
         if(value.testBit(i)) x = x.setBit(i)
       }
-      x
       ConcreteUInt(x, bitsWanted)
     }
   }
@@ -267,7 +266,9 @@ case class ConcreteUInt(val value: BigInt, val width: Int) extends Concrete {
   }
   val bitsRequired = requiredBits(value)
   if((width > 0) && (bitsRequired > width)) {
-    throw new InterpreterException(s"error: ConcreteUInt($value, $width) bad width $width needs ${requiredBits(value.toInt)}")
+    throw new InterpreterException(
+      s"error: ConcreteUInt($value, $width) bad width $width needs ${requiredBits(value.toInt)}"
+    )
   }
   def forceWidth(newWidth:Int): ConcreteUInt = {
     if(newWidth == width) this else ConcreteUInt(this.value, newWidth)

@@ -30,7 +30,7 @@ class ExpressionExecutionStack(dependencyGraph: DependencyGraph) {
     if(expressionStack.length > MaxExecutionDepth) {
 //      println(s"ExpressionStack to deep, max is ${MaxExecutionDepth}")
 //      println(stackListing)
-      throw new InterruptedException(s"ExpressionStack to deep, max is ${MaxExecutionDepth}")
+      throw new InterruptedException(s"ExpressionStack to deep, max is $MaxExecutionDepth")
     }
     keyOption.foreach { expressionKey =>
       if(stackKeys.contains(expressionKey)) {

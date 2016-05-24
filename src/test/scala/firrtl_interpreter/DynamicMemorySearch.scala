@@ -68,8 +68,11 @@ class DynamicMemorySearch extends FlatSpec with Matchers {
         poke("io_wrAddr", write_address)
         poke("io_data",   write_address)
         list(write_address) = write_address
+        interpreter.setVerbose(true)
         step(1)
       }
+
+      println(s"${interpreter.circuitState.memories("list").toString}")
 
       for (k <- 0 until 160) {
         println(s"memory test iteration $k") // ${"X"*80}")
@@ -77,7 +80,7 @@ class DynamicMemorySearch extends FlatSpec with Matchers {
         // Compute a random address and value
         val wrAddr = random.nextInt(n - 1)
         val data   = random.nextInt((1 << w) - 1)
-//        println(s"setting memory($wrAddr) = $data")
+        println(s"setting memory($wrAddr) = $data")
 
         // poke it intro memory
         poke("io_en", 0)
@@ -100,12 +103,13 @@ class DynamicMemorySearch extends FlatSpec with Matchers {
         } else {
           list.length - 1
         }
+        println(s"test pass $k ${this.interpreter.circuitState.prettyString()}")
 
         var waitCount = 0
         while(waitCount <= n && peek("io_done") == Big0) {
-//          println(s"Waiting for done $waitCount")
-//          println(this.interpreter.circuitState.prettyString())
-//          println(s"external list ${list.mkString(",")}")
+          println(s"Waiting for done $waitCount")
+          println(this.interpreter.circuitState.prettyString())
+          println(s"external list ${list.mkString(",")}")
           step(1)
           waitCount += 1
         }

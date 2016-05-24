@@ -115,7 +115,7 @@ class Memory(
     s"memory $name" +
     readPorts.mkString(" rp:", ",", "") +
     writePorts.mkString(" wp:", ",", " ") +
-    readWritePorts.mkString(" rwp:", ",", " ") +
+    readWritePorts.mkString(" rwp:[", ",", "] mem: ") +
       (0 until depth.min(maxMemoryInDefaultDisplay)).map(a => dataStore(a).value).mkString(",")
   }
 

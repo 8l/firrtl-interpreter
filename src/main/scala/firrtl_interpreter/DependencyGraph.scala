@@ -15,7 +15,7 @@ object DependencyGraph extends SimpleLogger {
       case Some(module) =>
         module
       case _ =>
-        throw InterpreterException(s"Could not find top level module in ${moduleName}")
+        throw InterpreterException(s"Could not find top level module in $moduleName")
     }
   }
 
@@ -38,7 +38,7 @@ object DependencyGraph extends SimpleLogger {
           WSubIndex(renameExpression(subExpression), value, tpe, gender)
         case ValidIf(condition, value, tpe) => ValidIf(renameExpression(condition), renameExpression(value), tpe)
         case DoPrim(op, args, const, tpe) =>
-          DoPrim(op, args.map {case expression => renameExpression(expression)}, const, tpe)
+          DoPrim(op, args.map {case subExpression => renameExpression(subExpression)}, const, tpe)
         case c: UIntValue => c
         case c: SIntValue => c
         case _ =>
