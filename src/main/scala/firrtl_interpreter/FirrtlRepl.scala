@@ -105,24 +105,17 @@ class FirrtlRepl {
         def run(args: Array[String]): Unit = {
           getOneArg("load filename") match {
             case Some(fileName) =>
-              try {
-                var file = new File(fileName)
+              var file = new File(fileName)
+              if(! file.exists()) {
+                file = new File(fileName + ".fir")
                 if(! file.exists()) {
-                  file = new File(fileName + ".fir")
-                  if(! file.exists()) {
-                    throw new Exception(s"file $fileName does not exist")
-                  }
+                  throw new Exception(s"file $fileName does not exist")
                 }
-                val input = io.Source.fromFile(file).mkString
-                interpreterOpt = Some(FirrtlTerp(input))
-                buildCompletions()
-                Timer.clear()
               }
-              catch {
-                case e: Exception =>
-                  error(s"exception ${e.getMessage} $e")
-                  e.printStackTrace()
-              }
+              val input = io.Source.fromFile(file).mkString
+              interpreterOpt = Some(FirrtlTerp(input))
+              buildCompletions()
+              Timer.clear()
             case _ =>
           }
         }
@@ -499,6 +492,8 @@ class FirrtlRepl {
         }
       }
       catch {
+        case ie: InterpreterException =>
+          console.println(s"Interpreter Exception occurred: ${ie.getMessage}")
         case e: NullPointerException =>
           error(s"repl error ${e.getMessage}")
           done = true

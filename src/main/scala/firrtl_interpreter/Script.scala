@@ -33,21 +33,13 @@ case class ScriptFactory(parent: FirrtlRepl) {
   var lastFileOption: Option[String] = None
 
   def apply(fileName: String): Option[Script] = {
-    try {
-      val file = new File(fileName)
-      if(! file.exists()) {
-        throw new Exception(s"file $fileName does not exist")
-      }
-      val scriptLines = io.Source.fromFile(file).mkString.split("\n").toArray
-      val script = new Script(fileName, scriptLines)
-      Some(script)
+    val file = new File(fileName)
+    if(! file.exists()) {
+      throw new Exception(s"file $fileName does not exist")
     }
-    catch {
-      case e: Exception =>
-        parent.error(s"exception ${e.getMessage} $e")
-        e.printStackTrace()
-        None
-    }
+    val scriptLines = io.Source.fromFile(file).mkString.split("\n").toArray
+    val script = new Script(fileName, scriptLines)
+    Some(script)
   }
 }
 

@@ -23,38 +23,27 @@ object DependencyGraph extends SimpleLogger {
     def expand(name: String): String = if(modulePrefix.isEmpty) name else modulePrefix + "." + name
 
     def renameExpression(expression: Expression): Expression = {
-      val result = try {
-        expression match {
-          case Mux(condition, trueExpression, falseExpression, tpe) =>
-            Mux(
-              renameExpression(condition),
-              renameExpression(trueExpression),
-              renameExpression(falseExpression),
-              tpe
-            )
-          case WRef(name, tpe, kind, gender) => WRef(expand(name), tpe, kind, gender)
-          case WSubField(subExpression, name, tpe, gender) =>
-            WSubField(renameExpression(subExpression), name, tpe, gender)
-          case WSubIndex(subExpression, value, tpe, gender) =>
-            WSubIndex(renameExpression(subExpression), value, tpe, gender)
-          case ValidIf(condition, value, tpe) => ValidIf(renameExpression(condition), renameExpression(value), tpe)
-          case DoPrim(op, args, const, tpe) =>
-            DoPrim(op, args.map {case expression => renameExpression(expression)}, const, tpe)
-          case c: UIntValue => c
-          case c: SIntValue => c
-          case _ =>
-            throw new Exception(s"renameExpression:error: unhandled expression $expression")
-        }
+      val result = expression match {
+        case Mux(condition, trueExpression, falseExpression, tpe) =>
+          Mux(
+            renameExpression(condition),
+            renameExpression(trueExpression),
+            renameExpression(falseExpression),
+            tpe
+          )
+        case WRef(name, tpe, kind, gender) => WRef(expand(name), tpe, kind, gender)
+        case WSubField(subExpression, name, tpe, gender) =>
+          WSubField(renameExpression(subExpression), name, tpe, gender)
+        case WSubIndex(subExpression, value, tpe, gender) =>
+          WSubIndex(renameExpression(subExpression), value, tpe, gender)
+        case ValidIf(condition, value, tpe) => ValidIf(renameExpression(condition), renameExpression(value), tpe)
+        case DoPrim(op, args, const, tpe) =>
+          DoPrim(op, args.map {case expression => renameExpression(expression)}, const, tpe)
+        case c: UIntValue => c
+        case c: SIntValue => c
+        case _ =>
+          throw new Exception(s"renameExpression:error: unhandled expression $expression")
       }
-      catch {
-        case ie: Exception =>
-          println(s"Error: ${ie.getMessage}")
-          throw ie
-        case ie: AssertionError =>
-          println(s"Error: ${ie.getMessage}")
-          throw ie
-      }
-
       result
     }
 
@@ -228,7 +217,7 @@ class DependencyGraph(val circuit: Circuit, val module: Module) {
     val newMemory = Memory(defMemory)
     memories(defMemory.name) = newMemory
     for(portKey <- newMemory.getAllFieldDependencies) {
-      println(s"Adding specific memory port $portKey to memoryKeys")
+      // println(s"Adding specific memory port $portKey to memoryKeys")
       memoryKeys(portKey) = newMemory
     }
     newMemory

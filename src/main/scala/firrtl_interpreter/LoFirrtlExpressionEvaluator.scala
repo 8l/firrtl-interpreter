@@ -393,6 +393,8 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
     val toResolve: Iterable[String] = if(keyOrderInitialized) keyOrder else defaultKeysToResolve
 
     exceptionCaught = false
+    evaluationStack.clear()
+
     for(key <- toResolve) {
       resolveDependency(key)
     }

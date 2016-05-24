@@ -47,4 +47,9 @@ class ExpressionExecutionStack(dependencyGraph: DependencyGraph) {
     lastItem.lhsOpt.foreach { key => stackKeys -= key }
     lastItem
   }
+
+  def clear(): Unit = {
+    expressionStack.clear()
+    stackKeys.clear()
+  }
 }
