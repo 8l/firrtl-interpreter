@@ -21,7 +21,7 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
 
   var exceptionCaught = false
 
-  setVerbose(true)
+  var useToplogicalSortedKeys = false
 
   case class StackItem(lhsOpt: Option[String], expression: Expression) {
     override def toString: String = {
@@ -388,6 +388,7 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
     }
     else {
       throw new InterpreterException(s"error: don't know what to do with key $key")
+//      ConcreteUInt(0, 1)
     }
 
     if(! keyOrderInitialized) {
@@ -402,10 +403,9 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
 
   def resolveDependencies(specificDependencies: Iterable[String]): Unit = {
     val toResolve: Iterable[String] = {
-      if(false && keyOrderInitialized) {
+      if(useToplogicalSortedKeys && keyOrderInitialized) {
         keyOrder
       } else {
-        println(s"Resolving keys\n${defaultKeysToResolve.mkString("\n")}")
         defaultKeysToResolve
       }
     }

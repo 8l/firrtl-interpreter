@@ -68,7 +68,6 @@ class DynamicMemorySearch extends FlatSpec with Matchers {
         poke("io_wrAddr", write_address)
         poke("io_data",   write_address)
         list(write_address) = write_address
-        interpreter.setVerbose(true)
         step(1)
       }
 
@@ -97,21 +96,19 @@ class DynamicMemorySearch extends FlatSpec with Matchers {
         poke("io_en", 1)
         step(1)
         poke("io_en", 0)
-//        step(1)
         val expectedIndex = if (list.contains(target)) {
           list.indexOf(target)
         } else {
           list.length - 1
         }
-        println(s"test pass $k ${this.interpreter.circuitState.prettyString()}")
+        // println(s"test pass $k ${this.interpreter.circuitState.prettyString()}")
 
         var waitCount = 0
         while(waitCount <= n && peek("io_done") == Big0) {
-          println(s"Waiting for done $waitCount")
-          println(this.interpreter.circuitState.prettyString())
-          println(s"external list ${list.mkString(",")}")
+          // println(s"Waiting for done $waitCount")
+          // println(this.interpreter.circuitState.prettyString())
+          // println(s"external list ${list.mkString(",")}")
           step(1)
-          println("X"*80)
           waitCount += 1
         }
 

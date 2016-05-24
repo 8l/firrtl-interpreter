@@ -14,6 +14,7 @@ circuit Top :
             writer => T_1751
             read-under-write => undefined
         tag_arr_3.T_1111.addr <= addr
+        tag_arr_3.T_1111.en <= UInt<1>("h01")
         data <= tag_arr_3.T_1111.data
 
     module Level1 :
