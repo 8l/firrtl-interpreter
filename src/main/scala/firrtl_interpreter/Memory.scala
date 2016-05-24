@@ -103,12 +103,13 @@ class Memory(
     log(s"memory cycled $toString")
   }
 
-  def getFieldDependencies(portName: String): Seq[String] = {
-    ports(portName).fieldDependencies
-  }
-
   def getAllFieldDependencies: Seq[String] = {
     (readPorts ++ writePorts ++ readWritePorts).flatMap { case port: MemoryPort => port.fieldDependencies}
+  }
+  def getAllOutputFields: Seq[(String, Seq[String])] = {
+    (readPorts ++ writePorts ++ readWritePorts).map { case port: MemoryPort =>
+      (port.outputFieldName, port.fieldDependencies)
+    }
   }
 
   override def toString: String = {
@@ -151,6 +152,7 @@ class Memory(
       }
     }
     def fieldDependencies: Seq[String]
+    val outputFieldName: String = s"$name.$portName.data"
     val fullName: String = s"memory $name.$portName"
   }
 
@@ -349,6 +351,7 @@ class Memory(
 
     }
     val fieldDependencies = Seq("en", "addr", "mask", "wmode").map { fieldName => s"$name.$portName.$fieldName"}
+    override val outputFieldName = "$name.$portName.rdata"
 
     override def toString: String = {
       s"[${if(writeMode)"W" else "R"}:$enable:$address:${data.value}:${readData.value},${mask.value}" +

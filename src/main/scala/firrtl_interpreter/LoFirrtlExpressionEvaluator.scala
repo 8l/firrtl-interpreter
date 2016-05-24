@@ -33,6 +33,7 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
 
   var defaultKeysToResolve = {
     val keys = new mutable.HashSet[String]
+
     keys ++= circuitState.memories.flatMap {
       case (name, memory) => memory.getAllFieldDependencies
     }.filter(dependencyGraph.nameToExpression.contains)
@@ -55,6 +56,12 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
     * @return
     */
   def getValue(key: String): Concrete = {
+    if(dependencyGraph.memoryOutputKeys.contains(key)) {
+      val dependentKeys = dependencyGraph.memoryOutputKeys(key)
+      for (elem <- dependentKeys) {
+        resolveDependency(elem)
+      }
+    }
     circuitState.getValue(key) match {
       case Some(value) => value
       case _ =>
@@ -369,14 +376,18 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
     val value = if(circuitState.isInput(key)) {
       circuitState.getValue(key).get
     }
-    else if(dependencyGraph.memoryKeys.contains(key)) {
-      dependencyGraph.memoryKeys(key).getValue(key)
-    }
-    else {
+    else if(dependencyGraph.nameToExpression.contains(key)) {
       val expression = dependencyGraph.nameToExpression(key)
       Timer(key) {
         evaluate(expression, Some(key))
       }
+    }
+    else if(dependencyGraph.memoryKeys.contains(key)) {
+
+      dependencyGraph.memoryKeys(key).getValue(key)
+    }
+    else {
+      throw new InterpreterException(s"error: don't know what to do with key $key")
     }
 
     if(! keyOrderInitialized) {
@@ -390,7 +401,14 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
   }
 
   def resolveDependencies(specificDependencies: Iterable[String]): Unit = {
-    val toResolve: Iterable[String] = if(keyOrderInitialized) keyOrder else defaultKeysToResolve
+    val toResolve: Iterable[String] = {
+      if(false && keyOrderInitialized) {
+        keyOrder
+      } else {
+        println(s"Resolving keys\n${defaultKeysToResolve.mkString("\n")}")
+        defaultKeysToResolve
+      }
+    }
 
     exceptionCaught = false
     evaluationStack.clear()

@@ -111,6 +111,7 @@ class DynamicMemorySearch extends FlatSpec with Matchers {
           println(this.interpreter.circuitState.prettyString())
           println(s"external list ${list.mkString(",")}")
           step(1)
+          println("X"*80)
           waitCount += 1
         }
 

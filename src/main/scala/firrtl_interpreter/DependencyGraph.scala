@@ -192,6 +192,7 @@ class DependencyGraph(val circuit: Circuit, val module: Module) {
   val registers        = new ArrayBuffer[DefRegister]
   val memories         = new mutable.HashMap[String, Memory]
   val memoryKeys       = new mutable.HashMap[String, Memory]
+  val memoryOutputKeys = new mutable.HashMap[String, Seq[String]]
   val stops            = new ArrayBuffer[Stop]
   val prints           = new ArrayBuffer[Print]
 
@@ -216,9 +217,9 @@ class DependencyGraph(val circuit: Circuit, val module: Module) {
   def addMemory(defMemory: DefMemory): Memory = {
     val newMemory = Memory(defMemory)
     memories(defMemory.name) = newMemory
-    for(portKey <- newMemory.getAllFieldDependencies) {
-      // println(s"Adding specific memory port $portKey to memoryKeys")
+    for((portKey, dependentPorts) <- newMemory.getAllOutputFields) {
       memoryKeys(portKey) = newMemory
+      memoryOutputKeys(portKey) = dependentPorts
     }
     newMemory
   }

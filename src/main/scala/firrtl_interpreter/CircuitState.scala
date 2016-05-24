@@ -59,10 +59,6 @@ case class CircuitState(
   var stateCounter = 0
   var isStale      = true
 
-  def getMemoryDependencies(memoryName: String, portName: String): Seq[String] = {
-    memories(memoryName).getFieldDependencies(portName)
-  }
-
   /**
     * in order to compute dependencies, ephemera must be clear and their
     * associated values cleared
