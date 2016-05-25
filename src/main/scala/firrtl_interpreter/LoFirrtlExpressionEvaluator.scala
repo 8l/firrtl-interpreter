@@ -14,7 +14,8 @@ import scala.collection.mutable.ArrayBuffer
   * @param circuitState  the state of the system, should not be modified before all dependencies have been resolved
   */
 //noinspection ScalaStyle,ScalaStyle
-class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState: CircuitState) extends SimpleLogger {
+class LoFirrtlExpressionEvaluator(val dependencyGraph: DependencyGraph, val circuitState: CircuitState)
+  extends SimpleLogger {
   var toResolve = mutable.HashSet(dependencyGraph.keys.toSeq:_*)
 
   var evaluateAll = false
@@ -23,13 +24,15 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
 
   var useToplogicalSortedKeys = false
 
+  var allowCombinationalLoops = false
+
   case class StackItem(lhsOpt: Option[String], expression: Expression) {
     override def toString: String = {
       s"${dependencyGraph.addKind(lhsOpt.getOrElse("     "))} -> ${expression.serialize}"
     }
   }
 
-  val evaluationStack = new ExpressionExecutionStack(dependencyGraph)
+  val evaluationStack = new ExpressionExecutionStack(this)
 
   var defaultKeysToResolve = {
     val keys = new mutable.HashSet[String]
@@ -253,7 +256,12 @@ class LoFirrtlExpressionEvaluator(dependencyGraph: DependencyGraph, circuitState
       }
     )
     indent()
-    evaluationStack.push(leftHandSideOption, expression)
+
+    if(! evaluationStack.push(leftHandSideOption, expression)) {
+      if(allowCombinationalLoops) {
+        return ConcreteUInt(1, 1)
+      }
+    }
 
     val result = try {
       expression match {

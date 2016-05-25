@@ -22,7 +22,7 @@ import scala.collection.mutable.ArrayBuffer
   * @param readWriters list of named read/write ports
   * @param readUnderWrite behavior
   */
-// TODO: Should we enable choke if fed values other than zero or 1 or things wider than 1
+// TODO: Should enable choke if fed values other than zero or 1 or things wider than 1
 class Memory(
               val info: Info,
               val name: String,
@@ -40,6 +40,7 @@ class Memory(
   val dataWidth    = typeToWidth(dataType)
   val addressWidth = requiredBits(depth)
   val bigDepth     = BigInt(depth)
+  var moduloIndex  = true
 
   val maxMemoryInDefaultDisplay = 20
 
@@ -60,7 +61,19 @@ class Memory(
     ports(readWriter).asInstanceOf[ReadWritePort]
   }.toArray
 
-  val dataStore: Array[Concrete] = Array.fill(depth)(Concrete(dataType))
+  /**
+    * wrap underlying data storage array so indexing is automatically constrained at depth
+    */
+  class DataStore {
+    val underlyingData: Array[Concrete] = Array.fill(depth)(Concrete(dataType))
+    def apply(index: Int): Concrete = underlyingData(index % depth)
+    def update(index: Int, value: Concrete): Unit = {
+      underlyingData(index % depth) = value
+    }
+    def length: Int = underlyingData.length
+  }
+
+  val dataStore = new DataStore
 
   def getValue(key: String): Concrete = {
     key match {

@@ -11,11 +11,12 @@ class MemorySpec extends FlatSpec with Matchers {
 
   it should "be creatable" in {
     val dataWidth = 42
+    val depth = 17
     val memory = Memory(DefMemory(
-      NoInfo, "memory1", UIntType(IntWidth(dataWidth)), 17, 1, 1, Seq("read1", "read2"), Seq("write1"), Seq()
+      NoInfo, "memory1", UIntType(IntWidth(dataWidth)), depth, 1, 1, Seq("read1", "read2"), Seq("write1"), Seq()
     ))
 
-    memory.depth should be(17)
+    memory.depth should be(depth)
     memory.readers.length should be(2)
     memory.readers.contains("read1") should be(true)
     memory.readers.contains("read2") should be(true)
@@ -23,7 +24,7 @@ class MemorySpec extends FlatSpec with Matchers {
     memory.writers.length should be(1)
     memory.writers.contains("write1") should be(true)
 
-    memory.dataStore.length should be(17)
+    memory.dataStore.length should be(depth)
   }
 
   it should "fields of a read port can be written then read" in {
@@ -34,16 +35,7 @@ class MemorySpec extends FlatSpec with Matchers {
     ))
 
     var key = "memory1.read1.en"
-//    memory.setValue(key, ConcreteUInt(Big1, dataWidth))
-//    memory.getValue(key).value should be(Big1)
-//    memory.setValue(key, ConcreteUInt(Big0, dataWidth))
-//    memory.getValue(key).value should be(Big0)
-//
-//    key = "memory1.read1.addr"
-//    for (value <- IntWidthTestValuesGenerator(0, depth)) {
-//      memory.setValue(key, ConcreteUInt(value, memory.addressWidth))
-//      memory.getValue(key).value should be(value)
-//    }
+
     key = "memory1.read1.data"
     for (value <- IntWidthTestValuesGenerator(0, depth)) {
       memory.setValue(key, ConcreteUInt(value, memory.addressWidth))

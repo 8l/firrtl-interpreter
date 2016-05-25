@@ -7,8 +7,10 @@ import firrtl.Expression
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
-class ExpressionExecutionStack(dependencyGraph: DependencyGraph) {
+class ExpressionExecutionStack(parent: LoFirrtlExpressionEvaluator) {
+  val dependencyGraph = parent.dependencyGraph
   val MaxExecutionDepth = 1000
+  def allowCombinationalLoops = parent.allowCombinationalLoops
 
   val expressionStack = new ArrayBuffer[StackItem]
   val stackKeys = new mutable.HashSet[String]
@@ -25,21 +27,24 @@ class ExpressionExecutionStack(dependencyGraph: DependencyGraph) {
     }.mkString("\n")
   }
 
-  def push(keyOption: Option[String], expression: Expression): Unit = {
+  def push(keyOption: Option[String], expression: Expression): Boolean = {
+    var returnValue = true
     expressionStack += StackItem(keyOption, expression)
     if(expressionStack.length > MaxExecutionDepth) {
-//      println(s"ExpressionStack to deep, max is ${MaxExecutionDepth}")
-//      println(stackListing)
       throw new InterruptedException(s"ExpressionStack to deep, max is $MaxExecutionDepth")
     }
     keyOption.foreach { expressionKey =>
       if(stackKeys.contains(expressionKey)) {
-//        println(s"key ${expressionKey} already in stack of size ${expressionStack.length}")
-//        println(stackListing)
-        throw new InterpreterException(s"Expression key $expressionKey already in stack")
+        if(allowCombinationalLoops) {
+          returnValue = false
+        }
+        else {
+          throw new InterpreterException(s"Expression key $expressionKey already in stack")
+        }
       }
       stackKeys += expressionKey
     }
+    returnValue
   }
 
   def pop(): StackItem = {

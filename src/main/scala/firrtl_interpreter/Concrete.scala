@@ -78,7 +78,12 @@ trait Concrete {
     case ConcreteSInt(v, w) => ConcreteSInt(this.value, this.width.max(n))
   }
   // Casting     TODO: I don't think this is done right, need to look at top bit each way
-  def asUInt: ConcreteUInt = ConcreteUInt(this.value, this.width)
+  def asUInt: ConcreteUInt = {
+    this match {
+      case si: ConcreteSInt => tail(0)
+      case _ => ConcreteUInt(this.value, this.width)
+    }
+  }
   def asSInt: ConcreteSInt = {
     ConcreteSInt(if(this.value == Big1 && this.width == 1) -1 else this.value, this.width)
   }
@@ -182,17 +187,17 @@ trait Concrete {
   def tail(n: Int): ConcreteUInt = {
     assert(n >= 0, s"Error:TAIL_OP($this, n=$n) n must be >= 0")
     assert(n < width, s"Error:TAIL_OP($this, n=$n) n must be < ${this.width}")
-    if(n == 0) {
-      ConcreteUInt(value, width)
-    }
-    else {
+//    if(n == 0) {
+//      ConcreteUInt(value, width)
+//    }
+//    else {
       var x = Big0
       val bitsWanted = width - n
       for(i <- 0 until bitsWanted) {
         if(value.testBit(i)) x = x.setBit(i)
       }
       ConcreteUInt(x, bitsWanted)
-    }
+//    }
   }
 
   def andReduce: Concrete = this match {
