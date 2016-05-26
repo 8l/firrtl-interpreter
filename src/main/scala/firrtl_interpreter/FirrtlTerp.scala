@@ -143,7 +143,4 @@ object FirrtlTerp {
     interpreter.evaluateCircuit()
     interpreter
   }
-
-  def main(args: Array[String]) {
-  }
 }

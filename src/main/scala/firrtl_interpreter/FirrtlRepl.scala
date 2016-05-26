@@ -3,6 +3,8 @@ package firrtl_interpreter
 
 import java.io.File
 
+import scopt.OptionParser
+
 import scala.collection.mutable.ArrayBuffer
 import scala.tools.jline.console.ConsoleReader
 import scala.tools.jline.console.history.FileHistory
@@ -20,7 +22,7 @@ abstract class Command(val name: String) {
   }
 }
 
-class FirrtlRepl {
+class FirrtlRepl(replConfig: ReplConfig) {
   val terminal = TerminalFactory.create()
   val console = new ConsoleReader
   val historyPath = "~/.firrtl_repl_history".replaceFirst("^~",System.getProperty("user.home"))
@@ -44,6 +46,40 @@ class FirrtlRepl {
   var currentScript: Option[Script] = None
   val intPattern = """(-?\d+)""".r
 
+  def loadFile(fileName: String): Unit = {
+    var file = new File(fileName)
+    if(! file.exists()) {
+      file = new File(fileName + ".fir")
+      if(! file.exists()) {
+        throw new Exception(s"file $fileName does not exist")
+      }
+    }
+    val input = io.Source.fromFile(file).mkString
+    interpreterOpt = Some(FirrtlTerp(input))
+    interpreterOpt.foreach { _=>
+      interpreter.evaluator.allowCombinationalLoops = replConfig.allowCycles
+      interpreter.evaluator.useTopologicalSortedKeys = replConfig.sortKeys
+      console.println(s"Flags: $showFlags")
+      console.println(
+        s"dependency graph ${interpreter.dependencyGraph.validNames.size} elements " +
+          s"${DependencyGraph.statements} statements ${DependencyGraph.nodes} nodes"
+      )
+    }
+
+
+
+    buildCompletions()
+    Timer.clear()
+  }
+
+  def loadScript(fileName: String): Unit = {
+    currentScript = scriptFactory(fileName)
+    currentScript match {
+      case Some(script) =>
+        console.println(s"loaded script file ${script.length} with ${script.fileName} lines")
+      case _ =>
+    }
+  }
   // scalastyle:off number.of.methods
   object Commands {
     def getOneArg(failureMessage: String, argOption: Option[String] = None): Option[String] = {
@@ -92,6 +128,7 @@ class FirrtlRepl {
           None
       }
     }
+
     val commands = ArrayBuffer.empty[Command]
     commands ++= Seq(
       new Command("load") {
@@ -104,23 +141,7 @@ class FirrtlRepl {
         }
         def run(args: Array[String]): Unit = {
           getOneArg("load filename") match {
-            case Some(fileName) =>
-              var file = new File(fileName)
-              if(! file.exists()) {
-                file = new File(fileName + ".fir")
-                if(! file.exists()) {
-                  throw new Exception(s"file $fileName does not exist")
-                }
-              }
-              val input = io.Source.fromFile(file).mkString
-              interpreterOpt = Some(FirrtlTerp(input))
-              console.println(
-                s"dependency graph ${interpreter.dependencyGraph.validNames.size} elements " +
-                s"${DependencyGraph.statements} statements ${DependencyGraph.nodes} nodes"
-              )
-
-              buildCompletions()
-              Timer.clear()
+            case Some(fileName) => loadFile(fileName)
             case _ =>
           }
         }
@@ -135,13 +156,8 @@ class FirrtlRepl {
         }
         def run(args: Array[String]): Unit = {
           getOneArg("script filename") match {
-            case Some(fileName) =>
-              currentScript = scriptFactory(fileName)
-              currentScript match {
-                case Some(script) =>
-                  console.println(s"loaded ${script.length} ${script.fileName}")
-                case _ =>
-              }
+            case Some(fileName) => loadScript(fileName)
+
             case _ =>
           }
         }
@@ -455,13 +471,69 @@ class FirrtlRepl {
           }
         }
         def run(args: Array[String]): Unit = {
-          getOneArg("verbose must be followed by true false or toggle", Some("toggle")) match {
+          getOneArg("eval-all must be followed by true false or toggle", Some("toggle")) match {
             case Some("toggle") => interpreter.evaluator.evaluateAll = ! interpreter.evaluator.evaluateAll
             case Some("true")   => interpreter.evaluator.evaluateAll = true
             case Some("false")  => interpreter.evaluator.evaluateAll = false
             case _ =>
           }
           console.println(s"evaluator verbosity is now ${interpreter.evaluator.evaluateAll}")
+        }
+      },
+      new Command("allow-cycles") {
+        def usage: (String, String) = ("allow-cycles [true|false|toggle]",
+          "set evaluator allow combinational loops (could cause correctness problems")
+        override def completer: Option[ArgumentCompleter] = {
+          if(interpreterOpt.isEmpty) {
+            None
+          }
+          else {
+            val validVerbose = ArrayBuffer.empty[String]
+            validVerbose ++= Seq("true", "false", "toggle")
+            val list: java.util.List[String] = validVerbose.asJava
+            Some(new ArgumentCompleter(
+              new StringsCompleter({ "allow-cycles"}),
+              new StringsCompleter(list)
+            ))
+          }
+        }
+        def run(args: Array[String]): Unit = {
+          getOneArg("allow-cycles must be followed by true false or toggle", Some("toggle")) match {
+            case Some("toggle") =>
+              interpreter.evaluator.allowCombinationalLoops = ! interpreter.evaluator.allowCombinationalLoops
+            case Some("true")   => interpreter.evaluator.allowCombinationalLoops = true
+            case Some("false")  => interpreter.evaluator.allowCombinationalLoops = false
+            case _ =>
+          }
+          console.println(s"evaluator allow combinational loops is now ${interpreter.evaluator.evaluateAll}")
+        }
+      },
+      new Command("ordered-exec") {
+        def usage: (String, String) = ("ordered-exec [true|false|toggle]",
+          "set evaluator execute circuit in dependency order, now recursive component evaluation")
+        override def completer: Option[ArgumentCompleter] = {
+          if(interpreterOpt.isEmpty) {
+            None
+          }
+          else {
+            val validVerbose = ArrayBuffer.empty[String]
+            validVerbose ++= Seq("true", "false", "toggle")
+            val list: java.util.List[String] = validVerbose.asJava
+            Some(new ArgumentCompleter(
+              new StringsCompleter({ "ordered-exec"}),
+              new StringsCompleter(list)
+            ))
+          }
+        }
+        def run(args: Array[String]): Unit = {
+          getOneArg("ordered-exec must be followed by true false or toggle", Some("toggle")) match {
+            case Some("toggle") =>
+              interpreter.evaluator.useTopologicalSortedKeys = ! interpreter.evaluator.useTopologicalSortedKeys
+            case Some("true")   => interpreter.evaluator.useTopologicalSortedKeys = true
+            case Some("false")  => interpreter.evaluator.useTopologicalSortedKeys = false
+            case _ =>
+          }
+          console.println(s"evaluator ordered-exec is now ${interpreter.evaluator.evaluateAll}")
         }
       },
       new Command("help") {
@@ -502,8 +574,7 @@ class FirrtlRepl {
       case Some(script) =>
         script.getNextLineOption match {
           case Some(line) =>
-            console.println(s"$line    [${script.currentLine}:${script.fileName}]")
-            console.println()
+            console.println(s"[${script.currentLine}:${script.fileName}] $line")
             line
           case _ =>
             console.readLine()
@@ -523,6 +594,7 @@ class FirrtlRepl {
 
   def run() {
     buildCompletions()
+
     console.setPrompt("firrtl>> ")
 
     while (! done) {
@@ -564,11 +636,47 @@ class FirrtlRepl {
   def error(message: String): Unit = {
     console.println(s"Error: $message")
   }
+
+  def showFlags: String = {
+    s"allow-cycles: ${interpreter.evaluator.allowCombinationalLoops} " +
+    s"ordered-exec: ${interpreter.evaluator.useTopologicalSortedKeys}"
+  }
 }
 
+
 object FirrtlRepl {
+  val parser = new OptionParser[ReplConfig]("scopt") {
+    head("scopt", "3.x")
+    opt[Boolean]('c', "allow-cycles") action { (x, c) =>
+      c.copy(allowCycles = x)
+    } text { "allow-cycles will attempt allow circuit to run with a combinational loop" }
+
+    opt[Boolean]('o', "ordered-exec") action { (x, c) =>
+      c.copy(sortKeys = x)
+    } text { "execute in dependency order, can increase traversed branches" }
+
+    opt[String]('i', "input") action { (x, c) =>
+      c.copy(firrtlSourceName = x)
+    } text { "firrtl file to execute" }
+
+    opt[String]('s', "script") action { (x, c) =>
+      c.copy(scriptName = x)
+    } text { "script file to load" }
+
+  }
   def main(args: Array[String]): Unit = {
-    val repl = new FirrtlRepl
-    repl.run()
+    parser.parse(args, ReplConfig()) match {
+      case Some(replConfig) =>
+        val repl = new FirrtlRepl(replConfig)
+        if(replConfig.firrtlSourceName.nonEmpty) {
+          repl.loadFile(replConfig.firrtlSourceName)
+        }
+        if(replConfig.scriptName.nonEmpty) {
+          repl.loadScript(replConfig.scriptName)
+        }
+
+        repl.run()
+      case _ =>
+    }
   }
 }
