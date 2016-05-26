@@ -48,7 +48,7 @@ class LoFirrtlExpressionEvaluator(val dependencyGraph: DependencyGraph, val circ
   }
 
   var keyOrderInitialized = false
-  val keyOrder = new ArrayBuffer[String]()
+  val orderedKeysToResolve = new ArrayBuffer[String]()
 
   /**
     * get the value from the current circuit state, if it is dependent on something else
@@ -381,26 +381,25 @@ class LoFirrtlExpressionEvaluator(val dependencyGraph: DependencyGraph, val circ
   private def resolveDependency(key: String): Concrete = {
     resolveDepth += 1
 
-    val value = if(circuitState.isInput(key)) {
-      circuitState.getValue(key).get
-    }
-    else if(dependencyGraph.nameToExpression.contains(key)) {
-      val expression = dependencyGraph.nameToExpression(key)
-      Timer(key) {
+    val value = Timer(key) {
+      if (circuitState.isInput(key)) {
+        circuitState.getValue(key).get
+      }
+      else if (dependencyGraph.nameToExpression.contains(key)) {
+        val expression = dependencyGraph.nameToExpression(key)
         evaluate(expression, Some(key))
       }
+      else if (dependencyGraph.memoryKeys.contains(key)) {
+        dependencyGraph.memoryKeys(key).getValue(key)
+      }
+      else {
+        throw new InterpreterException(s"error: don't know what to do with key $key")
+        //      ConcreteUInt(0, 1)
+      }
     }
-    else if(dependencyGraph.memoryKeys.contains(key)) {
 
-      dependencyGraph.memoryKeys(key).getValue(key)
-    }
-    else {
-      throw new InterpreterException(s"error: don't know what to do with key $key")
-//      ConcreteUInt(0, 1)
-    }
-
-    if(! keyOrderInitialized) {
-      keyOrder += key
+    if(useToplogicalSortedKeys && ! keyOrderInitialized) {
+      orderedKeysToResolve += key
     }
     circuitState.setValue(key, value)
 
@@ -412,7 +411,7 @@ class LoFirrtlExpressionEvaluator(val dependencyGraph: DependencyGraph, val circ
   def resolveDependencies(specificDependencies: Iterable[String]): Unit = {
     val toResolve: Iterable[String] = {
       if(useToplogicalSortedKeys && keyOrderInitialized) {
-        keyOrder
+        orderedKeysToResolve
       } else {
         defaultKeysToResolve
       }
@@ -425,8 +424,8 @@ class LoFirrtlExpressionEvaluator(val dependencyGraph: DependencyGraph, val circ
       resolveDependency(key)
     }
 
-    if(! keyOrderInitialized) {
-      println(s"Key order ${keyOrder.mkString("\n")}")
+    if(useToplogicalSortedKeys && ! keyOrderInitialized) {
+      println(s"Key order ${orderedKeysToResolve.mkString("\n")}")
       keyOrderInitialized = true
     }
   }
@@ -436,7 +435,7 @@ class LoFirrtlExpressionEvaluator(val dependencyGraph: DependencyGraph, val circ
       val resetCondition = evaluate(registerDef.reset)
       if(resetCondition.value > 0 ) {
         val resetValue = evaluate(registerDef.init).forceWidth(typeToWidth(dependencyGraph.nameToType(registerDef.name)))
-        println(s"Register ${registerDef.name} reset to $resetValue")
+        // println(s"Register ${registerDef.name} reset to $resetValue")
         circuitState.nextRegisters(registerDef.name) = resetValue
       }
     }

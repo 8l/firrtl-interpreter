@@ -10,6 +10,9 @@ import scala.collection.mutable.ArrayBuffer
 //noinspection ScalaStyle
 object DependencyGraph extends SimpleLogger {
 
+  var statements = 0
+  var nodes = 0
+
   def findTopLevelModule(moduleName: String, circuit: Circuit): Module = {
     circuit.modules.find(module => module.name == moduleName) match {
       case Some(module) =>
@@ -23,6 +26,7 @@ object DependencyGraph extends SimpleLogger {
     def expand(name: String): String = if(modulePrefix.isEmpty) name else modulePrefix + "." + name
 
     def renameExpression(expression: Expression): Expression = {
+      nodes += 1
       val result = expression match {
         case Mux(condition, trueExpression, falseExpression, tpe) =>
           Mux(
@@ -51,6 +55,7 @@ object DependencyGraph extends SimpleLogger {
       log(s"declaration:$kind:$name $expression $renamedExpression")
     }
 
+    statements += 1
     s match {
       case begin: Begin =>
         begin.stmts.map { case subStatement =>
@@ -154,6 +159,8 @@ object DependencyGraph extends SimpleLogger {
 
   def apply(circuit: Circuit): DependencyGraph = {
     val module = findTopLevelModule(circuit.main, circuit)
+    nodes = 0
+    statements = 0
 
     val dependencyGraph = new DependencyGraph(circuit, module)
 

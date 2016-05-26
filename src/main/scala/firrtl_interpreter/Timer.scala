@@ -8,10 +8,12 @@ import scala.collection.mutable
 
 case class TimerEvent(tag: String) {
   var events  = 0L
-  var seconds = 0L
+  var nanoseconds = 0L
+  var lastEventNanoseconds = 0L
 }
 
 object Timer {
+  val TenTo9th = 1000000000.0
   var enabled = true
   val timingLog = new mutable.HashMap[String, TimerEvent]
 
@@ -23,7 +25,8 @@ object Timer {
 
       val timerEvent = timingLog.getOrElseUpdate(tag, new TimerEvent(tag))
       timerEvent.events += 1
-      timerEvent.seconds += (t1 - t0)
+      timerEvent.nanoseconds += (t1 - t0)
+      timerEvent.lastEventNanoseconds = (t1 - t0)
       result
     }
     else {
@@ -33,7 +36,26 @@ object Timer {
 
   def entryFor(tag: String): String = {
     timingLog.get(tag) match {
-      case Some(entry) => s"${entry.events}:${entry.seconds}:${entry.seconds / entry.events}"
+      case Some(entry) => s"${entry.events}:${entry.nanoseconds}:${entry.nanoseconds / entry.events}"
+      case _           => ""
+    }
+  }
+
+  def prettyEntryForTag(tag: String): String = {
+    timingLog.get(tag) match {
+      case Some(entry) =>
+        val total_seconds = entry.nanoseconds.toDouble / TenTo9th
+        val averageSeconds = (entry.nanoseconds.toDouble / entry.events.toDouble) / TenTo9th
+        s"${entry.events}:${entry.nanoseconds}:${}"
+      case _           => ""
+    }
+  }
+
+  def prettyLastTime(tag: String): String = {
+    timingLog.get(tag) match {
+      case Some(entry) =>
+        val lastEventSeconds = entry.lastEventNanoseconds.toDouble / TenTo9th
+        s"$lastEventSeconds"
       case _           => ""
     }
   }

@@ -39,7 +39,7 @@ class TimerSpec extends FlatSpec with Matchers {
     }
     Timer.timingLog.size should be (1)
     Timer.timingLog(tag).events should be (1)
-    Timer.timingLog(tag).seconds should be > 2000000000L
+    Timer.timingLog(tag).nanoseconds should be > 2000000000L
     println(Timer.report())
   }
 }

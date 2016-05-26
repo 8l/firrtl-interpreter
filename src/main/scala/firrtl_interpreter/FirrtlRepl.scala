@@ -9,6 +9,7 @@ import scala.tools.jline.console.history.FileHistory
 import scala.tools.jline.TerminalFactory
 import scala.tools.jline.console.completer._
 import collection.JavaConverters._
+import collection.mutable.HashMap
 
 abstract class Command(val name: String) {
   def run(args: Array[String])
@@ -114,6 +115,11 @@ class FirrtlRepl {
               }
               val input = io.Source.fromFile(file).mkString
               interpreterOpt = Some(FirrtlTerp(input))
+              console.println(
+                s"dependency graph ${interpreter.dependencyGraph.validNames.size} elements " +
+                s"${DependencyGraph.statements} statements ${DependencyGraph.nodes} nodes"
+              )
+
               buildCompletions()
               Timer.clear()
             case _ =>
@@ -283,11 +289,18 @@ class FirrtlRepl {
             case Some(numberOfStepsString) =>
               try {
                 val numberOfSteps = numberOfStepsString.toInt
-                for(stepNumber <- 0 until numberOfSteps) {
-                  interpreter.cycle(showState = false)
-                  interpreter.evaluateCircuit()
+                Timer("steps") {
+                  for (stepNumber <- 0 until numberOfSteps) {
+                    Timer("step") {
+                      interpreter.cycle(showState = false)
+                      interpreter.evaluateCircuit()
+                    }
+                  }
                 }
-                console.println(interpreter.circuitState.prettyString())
+                if(! scriptRunning) {
+                  console.println(interpreter.circuitState.prettyString())
+                  console.println(s"step $numberOfSteps in ${Timer.prettyLastTime("steps")}")
+                }
               }
               catch {
                 case e: Exception =>
@@ -339,14 +352,14 @@ class FirrtlRepl {
         }
       },
       new Command("timing") {
-        def usage: (String, String) = ("timing [clear]", "show the current timing state")
+        def usage: (String, String) = ("timing [clear|bin]", "show the current timing state")
         override def completer: Option[ArgumentCompleter] = {
           if(interpreterOpt.isEmpty) {
             None
           }
           else {
             val validVerbose = ArrayBuffer.empty[String]
-            validVerbose ++= Seq("clear")
+            validVerbose ++= Seq("clear", "bin")
             val list: java.util.List[String] = validVerbose.asJava
             Some(new ArgumentCompleter(
               new StringsCompleter({ "timing"}),
@@ -357,9 +370,41 @@ class FirrtlRepl {
         def run(args: Array[String]): Unit = {
           getOneArg("", Some("")) match {
             case Some("clear") => Timer.clear()
+            case Some("bin") =>
+              val names = (interpreter.dependencyGraph.validNames -- interpreter.dependencyGraph.inputPorts)
+
+              val countPerName = new HashMap[Long, Long]
+              names.foreach { name =>
+                Timer.timingLog.get(name).foreach { t =>
+                  if(! countPerName.contains(t.events)) {
+                    countPerName(t.events) = 1
+                  }
+                  else {
+                    countPerName(t.events) = countPerName(t.events) + 1
+                  }
+                }
+              }
+              countPerName.keys.toSeq.sorted.foreach { count: Long =>
+                console.println(f"$count ${countPerName(count)}")
+              }
             case _ =>
-              val names = (interpreter.dependencyGraph.validNames -- interpreter.dependencyGraph.inputPorts).toSeq.sorted
-              for (name <- names) {
+              val names = (interpreter.dependencyGraph.validNames -- interpreter.dependencyGraph.inputPorts)
+
+              val sortedNames = names.toSeq.sortWith { case (a, b) =>
+                (Timer.timingLog.get(a), Timer.timingLog.get(b)) match {
+                  case (Some(t1), Some(t2)) =>
+                    if(t1.events == t2.events) {
+                      a < b
+                    }
+                    else {
+                      t1.events < t2.events
+                    }
+                  case (Some(t1), None)     => false
+                  case (None, Some(t2))     => true
+                  case _                    => a < b
+                }
+              }
+              for (name <- sortedNames) {
                 console.println(s"$name:${Timer.entryFor(name)}")
               }
           }
@@ -467,6 +512,14 @@ class FirrtlRepl {
     }
   }
 
+  def scriptRunning: Boolean = {
+    currentScript match {
+      case Some(script) => script.hasNext
+      case _            => false
+    }
+  }
+
+
   def run() {
     buildCompletions()
     console.setPrompt("firrtl>> ")
@@ -497,6 +550,8 @@ class FirrtlRepl {
         case e: NullPointerException =>
           error(s"repl error ${e.getMessage}")
           done = true
+        case e: Exception =>
+          console.println(s"Exception occurred: ${e.getMessage}")
       }
     }
     console.println(s"saving history ${history.size()}")
