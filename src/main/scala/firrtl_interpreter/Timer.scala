@@ -25,8 +25,9 @@ object Timer {
 
       val timerEvent = timingLog.getOrElseUpdate(tag, new TimerEvent(tag))
       timerEvent.events += 1
-      timerEvent.nanoseconds += (t1 - t0)
-      timerEvent.lastEventNanoseconds = (t1 - t0)
+      val delta = t1 - t0
+      timerEvent.nanoseconds += delta
+      timerEvent.lastEventNanoseconds = delta
       result
     }
     else {

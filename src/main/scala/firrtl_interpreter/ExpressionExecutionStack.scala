@@ -10,7 +10,7 @@ import scala.collection.mutable.ArrayBuffer
 class ExpressionExecutionStack(parent: LoFirrtlExpressionEvaluator) {
   val dependencyGraph = parent.dependencyGraph
   val MaxExecutionDepth = 1000
-  def allowCombinationalLoops = parent.allowCombinationalLoops
+  def allowCombinationalLoops: Boolean = parent.allowCombinationalLoops
 
   val expressionStack = new ArrayBuffer[StackItem]
   val stackKeys = new mutable.HashSet[String]

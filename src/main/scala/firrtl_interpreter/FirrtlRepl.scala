@@ -9,7 +9,6 @@ import scala.tools.jline.console.history.FileHistory
 import scala.tools.jline.TerminalFactory
 import scala.tools.jline.console.completer._
 import collection.JavaConverters._
-import collection.mutable.HashMap
 
 abstract class Command(val name: String) {
   def run(args: Array[String])
@@ -21,7 +20,6 @@ abstract class Command(val name: String) {
   }
 }
 
-//noinspection ScalaStyle
 class FirrtlRepl {
   val terminal = TerminalFactory.create()
   val console = new ConsoleReader
@@ -46,6 +44,7 @@ class FirrtlRepl {
   var currentScript: Option[Script] = None
   val intPattern = """(-?\d+)""".r
 
+  // scalastyle:off number.of.methods
   object Commands {
     def getOneArg(failureMessage: String, argOption: Option[String] = None): Option[String] = {
       if(args.length == 2) {
@@ -160,8 +159,8 @@ class FirrtlRepl {
               getOneArg("run [linesToRun|all|reset]", argOption = Some("all")) match {
                 case Some("all")   =>
                   console.println("run all")
-                  if(script.atEnd) script.reset()
-                  else script.runRemaining()
+                  if(script.atEnd) { script.reset() }
+                  else { script.runRemaining() }
                 case Some("reset") => script.reset()
                   console.println("run reset")
                 case Some(intPattern(intString)) =>
@@ -367,13 +366,14 @@ class FirrtlRepl {
             ))
           }
         }
+        // scalastyle:off cyclomatic.complexity
         def run(args: Array[String]): Unit = {
           getOneArg("", Some("")) match {
             case Some("clear") => Timer.clear()
             case Some("bin") =>
-              val names = (interpreter.dependencyGraph.validNames -- interpreter.dependencyGraph.inputPorts)
+              val names = interpreter.dependencyGraph.validNames -- interpreter.dependencyGraph.inputPorts
 
-              val countPerName = new HashMap[Long, Long]
+              val countPerName = new scala.collection.mutable.HashMap[Long, Long]
               names.foreach { name =>
                 Timer.timingLog.get(name).foreach { t =>
                   if(! countPerName.contains(t.events)) {
@@ -388,7 +388,7 @@ class FirrtlRepl {
                 console.println(f"$count ${countPerName(count)}")
               }
             case _ =>
-              val names = (interpreter.dependencyGraph.validNames -- interpreter.dependencyGraph.inputPorts)
+              val names = interpreter.dependencyGraph.validNames -- interpreter.dependencyGraph.inputPorts
 
               val sortedNames = names.toSeq.sortWith { case (a, b) =>
                 (Timer.timingLog.get(a), Timer.timingLog.get(b)) match {
@@ -486,6 +486,7 @@ class FirrtlRepl {
     )
     val commandMap = commands.map(command => command.name -> command).toMap
   }
+  //scalastyle:on
 
   def buildCompletions(): Unit = {
     console.setCompletionHandler(new CandidateListCompletionHandler {})

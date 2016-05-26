@@ -13,7 +13,6 @@ import scala.collection.mutable.ArrayBuffer
   *
   * @param circuitState  the state of the system, should not be modified before all dependencies have been resolved
   */
-//noinspection ScalaStyle,ScalaStyle
 class LoFirrtlExpressionEvaluator(val dependencyGraph: DependencyGraph, val circuitState: CircuitState)
   extends SimpleLogger {
   var toResolve = mutable.HashSet(dependencyGraph.keys.toSeq:_*)
@@ -22,7 +21,7 @@ class LoFirrtlExpressionEvaluator(val dependencyGraph: DependencyGraph, val circ
 
   var exceptionCaught = false
 
-  var useToplogicalSortedKeys = false
+  var useTopologicalSortedKeys = false
 
   var allowCombinationalLoops = false
 
@@ -248,6 +247,7 @@ class LoFirrtlExpressionEvaluator(val dependencyGraph: DependencyGraph, val circ
     * Note: OpCodes here are double matched, once in main loop herein, then again in function suitable for that
     * family of opCodes, it makes the code cleaner, I think, but may ultimately need to be inlined for performance
     */
+  // scalastyle:off cyclomatic.complexity method.length
   def evaluate(expression: Expression, leftHandSideOption: Option[String] = None): Concrete = {
     log(
       leftHandSideOption match {
@@ -372,6 +372,8 @@ class LoFirrtlExpressionEvaluator(val dependencyGraph: DependencyGraph, val circ
 
     result
   }
+  // scalastyle:on
+
 
   def showStack(): Unit = {
     println("Expression Evaluation stack")
@@ -398,7 +400,7 @@ class LoFirrtlExpressionEvaluator(val dependencyGraph: DependencyGraph, val circ
       }
     }
 
-    if(useToplogicalSortedKeys && ! keyOrderInitialized) {
+    if(useTopologicalSortedKeys && ! keyOrderInitialized) {
       orderedKeysToResolve += key
     }
     circuitState.setValue(key, value)
@@ -410,7 +412,7 @@ class LoFirrtlExpressionEvaluator(val dependencyGraph: DependencyGraph, val circ
 
   def resolveDependencies(specificDependencies: Iterable[String]): Unit = {
     val toResolve: Iterable[String] = {
-      if(useToplogicalSortedKeys && keyOrderInitialized) {
+      if(useTopologicalSortedKeys && keyOrderInitialized) {
         orderedKeysToResolve
       } else {
         defaultKeysToResolve
@@ -424,7 +426,7 @@ class LoFirrtlExpressionEvaluator(val dependencyGraph: DependencyGraph, val circ
       resolveDependency(key)
     }
 
-    if(useToplogicalSortedKeys && ! keyOrderInitialized) {
+    if(useTopologicalSortedKeys && ! keyOrderInitialized) {
       println(s"Key order ${orderedKeysToResolve.mkString("\n")}")
       keyOrderInitialized = true
     }
@@ -434,7 +436,9 @@ class LoFirrtlExpressionEvaluator(val dependencyGraph: DependencyGraph, val circ
     for(registerDef <- dependencyGraph.registers) {
       val resetCondition = evaluate(registerDef.reset)
       if(resetCondition.value > 0 ) {
-        val resetValue = evaluate(registerDef.init).forceWidth(typeToWidth(dependencyGraph.nameToType(registerDef.name)))
+        val resetValue = {
+          evaluate(registerDef.init).forceWidth(typeToWidth(dependencyGraph.nameToType(registerDef.name)))
+        }
         // println(s"Register ${registerDef.name} reset to $resetValue")
         circuitState.nextRegisters(registerDef.name) = resetValue
       }

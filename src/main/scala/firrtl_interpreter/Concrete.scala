@@ -3,6 +3,7 @@ package firrtl_interpreter
 
 import firrtl._
 
+// scalastyle:off number.of.methods
 trait Concrete {
   val value : BigInt
   val width : Int

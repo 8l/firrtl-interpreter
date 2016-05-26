@@ -7,9 +7,8 @@ import firrtl._
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
-//noinspection ScalaStyle
 object DependencyGraph extends SimpleLogger {
-
+  val MaxColumnWidth = 100 // keeps displays of expressions readable
   var statements = 0
   var nodes = 0
 
@@ -22,6 +21,7 @@ object DependencyGraph extends SimpleLogger {
     }
   }
 
+  // scalastyle:off
   def processDependencyStatements(modulePrefix: String, s: Stmt, dependencyGraph: DependencyGraph): Stmt = {
     def expand(name: String): String = if(modulePrefix.isEmpty) name else modulePrefix + "." + name
 
@@ -130,6 +130,7 @@ object DependencyGraph extends SimpleLogger {
         s
     }
   }
+  // scalastyle:on
 
   def processModule(modulePrefix: String, module: Module, dependencyGraph: DependencyGraph): Unit = {
     module match {
@@ -184,7 +185,7 @@ object DependencyGraph extends SimpleLogger {
     log(s"For module ${module.name} dependencyGraph =")
     dependencyGraph.nameToExpression.keys.toSeq.sorted foreach { case k =>
       val v = dependencyGraph.nameToExpression(k).serialize
-      log(s"  $k -> (" + v.toString.take(100) + ")")
+      log(s"  $k -> (" + v.toString.take(MaxColumnWidth) + ")")
     }
     println(s"End of dependency graph")
     dependencyGraph
